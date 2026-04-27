@@ -719,14 +719,46 @@
   // ==================== 初始化 ====================
 
   function init() {
-    if (!document.getElementById('xxt-float')) {
-      createFloatUI();
-      log('插件已加载，点击「开始搜题」');
+    if (document.getElementById('xxt-float')) return;
+
+    // 页面可能是 SPA 动态渲染，等待 body 和内容出现
+    if (!document.body || document.body.children.length === 0) return false;
+
+    createFloatUI();
+    log('插件已加载，点击「搜题」');
+    return true;
+  }
+
+  // 轮询等待页面渲染完成
+  function waitForPageReady() {
+    const maxWait = 15000; // 最多等 15 秒
+    const interval = 500;
+    let elapsed = 0;
+
+    function tryInit() {
+      if (init()) return; // 初始化成功，停止轮询
+      elapsed += interval;
+      if (elapsed < maxWait) {
+        setTimeout(tryInit, interval);
+      }
+    }
+
+    // 立即尝试 + 轮询
+    tryInit();
+
+    // MutationObserver 监听 DOM 变化，一旦有内容就初始化
+    if (document.documentElement) {
+      const observer = new MutationObserver(() => {
+        if (document.body && document.body.children.length > 0 && !document.getElementById('xxt-float')) {
+          init();
+          observer.disconnect();
+        }
+      });
+      observer.observe(document.documentElement, { childList: true, subtree: true });
+      // 15 秒后自动停止监听
+      setTimeout(() => observer.disconnect(), maxWait);
     }
   }
 
-  // 多次尝试初始化，应对页面动态加载
-  setTimeout(init, 300);
-  setTimeout(init, 1000);
-  setTimeout(init, 3000);
+  waitForPageReady();
 })();

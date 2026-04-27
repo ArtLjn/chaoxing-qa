@@ -28,7 +28,11 @@
         "https://mooc1.chaoxing.com/exam/dojoing*",
         "https://mooc1-1.chaoxing.com/exam/dojoing*",
         "https://mooc1.chaoxing.com/mooc-ans/mooc2/work/doHomeWork*",
-        "https://mooc1-1.chaoxing.com/mooc-ans/mooc2/work/doHomeWork*"
+        "https://mooc1-1.chaoxing.com/mooc-ans/mooc2/work/doHomeWork*",
+        "https://mooc1.chaoxing.com/mooc-ans/work/doHomeWorkNew*",
+        "https://mooc1-1.chaoxing.com/mooc-ans/work/doHomeWorkNew*",
+        "https://mooc1-2.chaoxing.com/mooc-ans/work/doHomeWorkNew*",
+        "https://mooc1.chaoxing.com/ananas/modules/work/*"
       ],
       "js": ["content.js"],
       "css": ["content.css"],

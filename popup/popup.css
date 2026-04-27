@@ -1,0 +1,137 @@
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  width: 320px;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  background: #1a1a2e;
+  color: #e0e0e0;
+}
+
+.container {
+  padding: 16px;
+}
+
+h1 {
+  font-size: 16px;
+  text-align: center;
+  color: #a8d8ea;
+  margin-bottom: 16px;
+  font-weight: 600;
+}
+
+.form-group {
+  margin-bottom: 12px;
+}
+
+label {
+  display: block;
+  font-size: 12px;
+  color: #888;
+  margin-bottom: 4px;
+}
+
+input[type="text"],
+input[type="password"],
+select {
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid #2a2a4a;
+  border-radius: 6px;
+  background: #16213e;
+  color: #e0e0e0;
+  font-size: 13px;
+  outline: none;
+  transition: border-color 0.2s;
+}
+
+input:focus,
+select:focus {
+  border-color: #533483;
+}
+
+input[type="range"] {
+  width: 100%;
+  margin-top: 4px;
+  accent-color: #533483;
+}
+
+#save {
+  width: 100%;
+  padding: 10px;
+  border: none;
+  border-radius: 8px;
+  background: linear-gradient(135deg, #0f3460, #533483);
+  color: #fff;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  margin-top: 4px;
+}
+
+#save:hover {
+  background: linear-gradient(135deg, #16213e, #6a4c93);
+}
+
+#status {
+  text-align: center;
+  margin-top: 8px;
+  font-size: 12px;
+  min-height: 18px;
+}
+
+#status.success {
+  color: #27ae60;
+}
+
+.divider {
+  height: 1px;
+  background: #2a2a4a;
+  margin: 16px 0;
+}
+
+.usage {
+  background: #16213e;
+  border-radius: 8px;
+  padding: 12px;
+  border: 1px solid #2a2a4a;
+}
+
+.usage h3 {
+  font-size: 12px;
+  color: #a8d8ea;
+  margin-bottom: 8px;
+}
+
+.usage ol {
+  padding-left: 18px;
+  font-size: 11px;
+  color: #888;
+  line-height: 2;
+}
+
+.model-wrapper {
+  display: flex;
+  gap: 6px;
+}
+
+.model-wrapper input {
+  flex: 1;
+  min-width: 0;
+}
+
+.model-wrapper select {
+  width: auto;
+  flex-shrink: 0;
+  max-width: 130px;
+}
+
+.hint {
+  font-size: 11px;
+  color: #666;
+  margin-top: 4px;
+}

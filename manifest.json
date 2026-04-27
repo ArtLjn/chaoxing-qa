@@ -1,0 +1,42 @@
+{
+  "manifest_version": 3,
+  "name": "学习通搜题助手",
+  "version": "1.0.0",
+  "description": "自动提取学习通作业题目，调用阿里百炼AI模型搜索答案",
+  "permissions": ["storage", "activeTab"],
+  "host_permissions": [
+    "https://mooc1.chaoxing.com/*",
+    "https://mooc1-1.chaoxing.com/*",
+    "https://mooc1-2.chaoxing.com/*",
+    "https://dashscope.aliyuncs.com/*"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://mooc1.chaoxing.com/mooc-ans/mooc2/work/dowork*",
+        "https://mooc1-1.chaoxing.com/mooc-ans/mooc2/work/dowork*",
+        "https://mooc1-2.chaoxing.com/mooc-ans/mooc2/work/dowork*",
+        "https://mooc1.chaoxing.com/mooc-ans/mooc2/exam/start*"
+      ],
+      "js": ["content.js"],
+      "css": ["content.css"],
+      "run_at": "document_idle"
+    }
+  ],
+  "action": {
+    "default_popup": "popup/popup.html",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
+    }
+  },
+  "icons": {
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  }
+}

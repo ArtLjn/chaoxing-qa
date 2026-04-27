@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <title>XXT Assistant</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <div class="container">
+    <h1>XXT Assistant</h1>
+
+    <div class="form-group">
+      <label>API Key</label>
+      <input type="password" id="apiKey" placeholder="sk-...">
+    </div>
+
+    <div class="form-group">
+      <label>模型</label>
+      <div class="model-wrapper">
+        <input type="text" id="modelInput" placeholder="输入自定义模型名称">
+        <select id="modelPreset">
+          <option value="">-- 快捷选择 --</option>
+          <option value="qwen-turbo">qwen-turbo</option>
+          <option value="qwen-plus" selected>qwen-plus</option>
+          <option value="qwen-max">qwen-max</option>
+          <option value="qwen-long">qwen-long</option>
+          <option value="deepseek-chat">deepseek-chat</option>
+          <option value="deepseek-reasoner">deepseek-reasoner</option>
+          <option value="gpt-4o">gpt-4o</option>
+          <option value="gpt-4o-mini">gpt-4o-mini</option>
+        </select>
+      </div>
+      <div class="hint">可从下拉框快捷选择，也可直接输入任意模型名</div>
+    </div>
+
+    <div class="form-group">
+      <label>Base URL</label>
+      <input type="text" id="baseUrl" placeholder="https://dashscope.aliyuncs.com/compatible-mode/v1">
+    </div>
+
+    <div class="form-group">
+      <label>每题延迟 <span id="delayValue">0.8</span>s</label>
+      <input type="range" id="delay" min="300" max="3000" step="100" value="800">
+    </div>
+
+    <button id="save">保存设置</button>
+
+    <div id="status"></div>
+
+    <div class="divider"></div>
+
+    <div class="usage">
+      <h3>使用说明</h3>
+      <ol>
+        <li>填写 API Key 并选择模型</li>
+        <li>打开学习通作业/考试页面</li>
+        <li>点击右下角浮窗「开始搜题」</li>
+        <li>参考答案手动填入页面</li>
+      </ol>
+    </div>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>

@@ -55,8 +55,11 @@
 
   function extractQuestions() {
     const questions = [];
-    // 学习通作业页：每题在 div[id^="question"] 里，class="questionLi"
-    const qList = document.querySelectorAll('div[id^="question"].questionLi');
+    // 多种选择器兼容不同页面
+    let qList = document.querySelectorAll('div[id^="question"].questionLi');
+    if (qList.length === 0) qList = document.querySelectorAll('div[id^="question"]');
+    if (qList.length === 0) qList = document.querySelectorAll('.TiMu.divQuestion');
+    if (qList.length === 0) qList = document.querySelectorAll('.divQuestion');
 
     qList.forEach((item, idx) => {
       const q = extractOneQuestion(item, idx);
@@ -72,27 +75,35 @@
       type: '',
       title: '',
       options: [],
-      element: el
+      element: el,
+      answered: false
     };
 
-    // 提取题型 + 题干（都在 h3.mark_name 里）
-    const h3 = el.querySelector('h3.mark_name');
+    // 检查是否已答：选择题有选中状态
+    question.answered = isAlreadyAnswered(el);
+
+    // 提取题型 + 题干
+    const h3 = el.querySelector('h3.mark_name, .mark_name, h3[class*="mark"]');
     if (h3) {
-      // 题型在 span.colorShallow，如 "(单选题)"
-      const typeSpan = h3.querySelector('span.colorShallow');
+      const typeSpan = h3.querySelector('span.colorShallow, .colorShallow');
       if (typeSpan) {
         question.type = typeSpan.textContent.trim().replace(/[()（）\[\]【】]/g, '');
       }
 
-      // 题干：取 h3 的纯文本，去掉序号和题型
       let titleText = h3.textContent;
-      // 去掉序号如 "1."
       titleText = titleText.replace(/^\s*\d+\s*[.．、]\s*/, '');
-      // 去掉题型标记如 "(单选题)"
       titleText = titleText.replace(/\(?(单选题|多选题|判断题|填空题|简答题)\)?/g, '');
-      titleText = titleText.replace(/（[^）]*题）/g, '');
+      titleText = titleText.replace(/（[^）]*题）?/g, '');
       titleText = titleText.replace(/\s+/g, ' ').trim();
       question.title = titleText;
+    } else {
+      // 备用：从整体文本提取
+      const allText = el.textContent;
+      const match = allText.match(/(?:\d+[.．、]\s*)?\(?(单选题|多选题|判断题|填空题|简答题)\)?\s*(.+)/);
+      if (match) {
+        question.type = match[1];
+        question.title = match[2].replace(/\s+/g, ' ').trim();
+      }
     }
 
     // 提取选项（div.answerBg 内，span.num_option 是字母，后面是选项文本）
@@ -139,6 +150,35 @@
     }
     const hasBlank = el.querySelector('input[type="text"], textarea');
     return hasBlank ? '填空题' : '简答题';
+  }
+
+  // 检测题目是否已经作答
+  function isAlreadyAnswered(el) {
+    // 选择题：检查是否有选中状态的选项
+    const checkedOpt = el.querySelector('div.answerBg.cur, div.answerBg.checked, div.answerBg.selected');
+    if (checkedOpt) return true;
+
+    // radio/checkbox 有选中
+    const checked = el.querySelector('input[type="radio"]:checked, input[type="checkbox"]:checked');
+    if (checked) return true;
+
+    // 填空题：检查编辑器是否有内容
+    const editable = el.querySelector('[contenteditable="true"]');
+    if (editable && editable.textContent.trim().length > 0) return true;
+
+    const iframe = el.querySelector('iframe');
+    if (iframe && iframe.contentDocument) {
+      const body = iframe.contentDocument.body;
+      if (body && body.textContent.trim().length > 0) return true;
+    }
+
+    const textInput = el.querySelector('input[type="text"]');
+    if (textInput && textInput.value.trim().length > 0) return true;
+
+    const textarea = el.querySelector('textarea');
+    if (textarea && textarea.value.trim().length > 0) return true;
+
+    return false;
   }
 
   // ==================== 答案面板 ====================
@@ -282,6 +322,13 @@
         updateFloatBtn();
 
         const q = questions[i];
+
+        // 跳过已答过的题目
+        if (q.answered) {
+          log(`[第${currentIndex}题] ⏭ 已答过，跳过`);
+          continue;
+        }
+
         log(`[第${currentIndex}题] 📖 ${q.title.substring(0, 60)}${q.title.length > 60 ? '...' : ''}`);
 
         if (q.options.length > 0) {

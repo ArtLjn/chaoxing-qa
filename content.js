@@ -54,36 +54,46 @@
   // ==================== font-cxsecret 字体解密 ====================
 
   const CXSECRET_CACHE_KEY = 'xxt_cxsecret_map';
-  // 约 2500 个最常用汉字，用于 canvas 渲染对比建立映射
+  const CANVAS_SIZE = 32;
+  // 约 3000 个常用汉字
   const COMMON_CHARS =
-    '的一是不了人我在有他这中大来上个国到说们为子和你地出会也时要就可以对生能而那得于着下自之年过发后作里用道行所然家种事成方多经么去法学如都同现当没动面起看定天分还进好小部其些主样理心她本前开但因只从想实日军者意无力它与长把机十民第公此已工使情明性知全三又关点正业外将两高间由问很最重并物手应战向头文体政美相见被利什二等产或新己制身果加西斯月话合回特代内信表化老给世位次度门任常先海通教儿原东声提立及比员解水名真论处走义各入几口认条平系气题活尔更别打女变四神总何电数安少报才结反受目太量再感建务做接必场件计管期市直德资命山金指克干排满西增则却石流统县难布声思华世收铁军确华车调代改转族城历千形确林极古组近花师央取受奇举命术款北且持住交推求更细断朋林怎格青空急织布局基影压质足注资汉答读际织规未调响收素约证议六止件流半食兴治张备济客留办积值府际置际步消越座整至配号群际展权值离抓支配改具收论落约始精红装适常调权朝历值门统适请落据须响育便平往今六采列备化完线万答办称收原龙思该反众电海则七术角需支具走号何类再严条展西支取复建眼约号具干形众清布格资铁指装铁始争流压八满备证周及况低必效精具周值验周量展采统切争完细术江青切百院近影指列区取老复按半青包各思养程列细角采青半华及南';
+    '的一是不了人我在有他这中大来上个国到说们为子和你地出会也时要就可以对生能而那得于着下自之年过发后作里用道行所然家种事成方多经么去法学如都同现当没动面起看定天分还进好小部其些主样理心她本前开但因只从想实日军者意无力它与长把机十民第公此已工使情明性知全三又关点正业外将两高间由问很最重并物手应战向头文体政美相见被利什二等产或新己制身果加西斯月话合回特代内信表化老给世位次度门任常先海通教儿原东声提立及比员解水名真论处走义各入几口认条平系气题活尔更别打女变四神总何电数安少报才结反受目太量再感建务做接必场件计管期市直德资命山金指克干排满西增则却石流统县难布思华收铁军确车调改转族城历千形极古组近花师央取奇举术款北且持住交推求细断朋怎格青空急织布局基影压质足注汉答读际规未响素约证议六止半食兴治张备济客留办积值府置步消越座整至配号群展权离支具论落始精红装适朝门请据须育便往今采列化完线万称原龙该众七角需走号类严条复建眼干形众清包各养程切百院近影指区老复按半青包各思养程列细角采青半华南层组终转号满争服写运输号影界满布收层效精具值验量展采统争完江切列区按养济复按列办备断各断收适效装争验适养装交需政术斗适效车具历育请落适际际界际际值际际际际际层装运界效确争据须响局争层满究断运形办运制阶术断线运究运程适形界线究线政适层度效制制度制际阶度运究究究术度制阶制究线运阶线究究运政制度线线运度线度阶政线制究度度运度度度线究阶政度度线度究度度度度度度度度度究度度度线究度度度线度度度究度度度度度度究度度度度度究度度度度度度度度度度度度度度度度度度度度度度度度度度度度度度度度度度度度度度度度度度度度度度度度度度度度度度度度度度度度度度度度度度度度度度度度度度度度度度度度度度度';
 
   // 检测页面是否使用了 cxsecret 字体
   function hasCxSecretFont() {
     return !!document.getElementById('cxSecretStyle');
   }
 
-  // 用 canvas 渲染单个字符，返回像素指纹（简单 hash）
-  function renderCharFingerprint(char, fontFamily) {
+  // 用 canvas 渲染字符，返回 Uint8Array 像素数据（只取 alpha 通道二值化）
+  function renderCharBitmap(char, fontFamily) {
     const canvas = document.createElement('canvas');
-    canvas.width = 28;
-    canvas.height = 28;
+    const s = CANVAS_SIZE;
+    canvas.width = s;
+    canvas.height = s;
     const ctx = canvas.getContext('2d');
-    ctx.clearRect(0, 0, 28, 28);
-    ctx.font = '18px ' + fontFamily + ', sans-serif';
+    ctx.clearRect(0, 0, s, s);
+    ctx.font = `20px "${fontFamily}", sans-serif`;
     ctx.textBaseline = 'middle';
     ctx.textAlign = 'center';
     ctx.fillStyle = '#000';
-    ctx.fillText(char, 14, 14);
-    const data = ctx.getImageData(0, 0, 28, 28).data;
-    // 对非透明像素做简单累加 hash，避免逐像素比较
-    let hash = 0;
-    for (let i = 0; i < data.length; i += 4) {
-      if (data[i + 3] > 0) {
-        hash = ((hash << 5) - hash + data[i] + data[i + 1] + data[i + 2]) | 0;
-      }
+    ctx.fillText(char, s / 2, s / 2);
+    const imgData = ctx.getImageData(0, 0, s, s).data;
+    // 二值化：alpha > 80 → 1, 否则 0
+    const bits = new Uint8Array(s * s);
+    for (let i = 0; i < s * s; i++) {
+      bits[i] = imgData[i * 4 + 3] > 80 ? 1 : 0;
     }
-    return hash;
+    return bits;
+  }
+
+  // 计算两个位图的相似度（0~1，1 = 完全相同）
+  function bitmapSimilarity(a, b) {
+    let match = 0;
+    const len = a.length;
+    for (let i = 0; i < len; i++) {
+      if (a[i] === b[i]) match++;
+    }
+    return match / len;
   }
 
   // 构建 cxsecret 字符 → 明文字符的映射表
@@ -98,20 +108,19 @@
           return map;
         }
       }
-    } catch { /* 缓存无效，重新构建 */ }
+    } catch { /* 缓存无效 */ }
 
     // 等待字体加载完成
     await document.fonts.ready;
+    // 额外等待确保字体对 canvas 可用
+    await new Promise(r => setTimeout(r, 500));
 
-    // 收集页面中实际出现的需要解密的字符（排除常用汉字和 ASCII）
+    // 收集页面中实际出现的需要解密的字符
     const allText = document.body.textContent;
     const charSet = new Set();
     for (const ch of allText) {
       if (COMMON_CHARS.includes(ch) || /[\x00-\x7F]/.test(ch)) continue;
-      // 只保留可能是 cxsecret 替换的中文字符（CJK 统一汉字范围）
-      if (/[\u4e00-\u9fff]/.test(ch)) {
-        charSet.add(ch);
-      }
+      if (/[\u4e00-\u9fff]/.test(ch)) charSet.add(ch);
     }
 
     if (charSet.size === 0) {
@@ -121,34 +130,47 @@
 
     log(`[字体解密] 发现 ${charSet.size} 个待解密字符，开始构建映射...`);
 
-    // 用标准字体渲染常用汉字，建立参考指纹
-    const refFingerprints = new Map();
+    // 用标准字体渲染常用汉字，建立参考位图库
+    const refBitmaps = new Map();
     for (const ch of COMMON_CHARS) {
-      if (!refFingerprints.has(ch)) {
-        refFingerprints.set(ch, renderCharFingerprint(ch, 'sans-serif'));
+      if (!refBitmaps.has(ch)) {
+        refBitmaps.set(ch, renderCharBitmap(ch, 'sans-serif'));
       }
     }
 
-    // 用 cxsecret 字体渲染加密字符，匹配参考指纹
+    // 用 cxsecret 字体渲染加密字符，找最佳匹配
     const decryptMap = {};
-    for (const ch of charSet) {
-      const secretHash = renderCharFingerprint(ch, 'font-cxsecret');
-      for (const [refChar, refHash] of refFingerprints) {
-        if (secretHash === refHash) {
-          decryptMap[ch] = refChar;
-          break;
+    const encryptedChars = [...charSet];
+
+    for (let ci = 0; ci < encryptedChars.length; ci++) {
+      const ch = encryptedChars[ci];
+      const secretBitmap = renderCharBitmap(ch, 'font-cxsecret');
+
+      let bestChar = null;
+      let bestSim = 0;
+
+      for (const [refChar, refBitmap] of refBitmaps) {
+        const sim = bitmapSimilarity(secretBitmap, refBitmap);
+        if (sim > bestSim) {
+          bestSim = sim;
+          bestChar = refChar;
         }
+      }
+
+      // 相似度 > 90% 才采纳
+      if (bestSim > 0.9 && bestChar) {
+        decryptMap[ch] = bestChar;
       }
     }
 
     const mapped = Object.keys(decryptMap).length;
-    log(`[字体解密] 映射构建完成: ${mapped}/${charSet.size} 个字符成功匹配`);
+    log(`[字体解密] 映射完成: ${mapped}/${charSet.size} 个字符匹配 (阈值>90%)`);
 
-    // 缓存映射表
+    // 缓存
     if (mapped > 0) {
       try {
         localStorage.setItem(CXSECRET_CACHE_KEY, JSON.stringify(decryptMap));
-      } catch { /* 存储满等异常忽略 */ }
+      } catch { /* 存储满等忽略 */ }
     }
 
     return decryptMap;

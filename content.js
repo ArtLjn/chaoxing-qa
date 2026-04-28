@@ -430,10 +430,14 @@
 
   // ==================== 预览题目（调试用） ====================
 
-  function previewQuestions() {
+  async function previewQuestions() {
     // 清除旧的高亮
     document.querySelectorAll('.xxt-debug-tag').forEach(el => el.remove());
     document.querySelectorAll('div[id^="question"]').forEach(el => {
+      el.style.outline = '';
+      el.style.outlineOffset = '';
+    });
+    document.querySelectorAll('.TiMu').forEach(el => {
       el.style.outline = '';
       el.style.outlineOffset = '';
     });
@@ -442,15 +446,19 @@
 
     if (questions.length === 0) {
       log('⚠ 未检测到任何题目');
-      log('尝试的选择器: div[id^="question"].questionLi');
       return;
+    }
+
+    // 对题目做字体解密
+    for (const q of questions) {
+      q.title = await decryptCxSecretText(q.title);
+      q.options = await Promise.all(q.options.map(opt => decryptCxSecretText(opt)));
     }
 
     log(`📋 解析到 ${questions.length} 道题目：`);
     log('─'.repeat(40));
 
     questions.forEach(q => {
-      // 日志输出结构化数据
       log(`【第 ${q.index} 题】[${q.type}]`);
       log(`  题干: ${q.title}`);
       if (q.options.length > 0) {

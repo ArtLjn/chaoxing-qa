@@ -55,9 +55,9 @@
 
   function extractQuestions() {
     const questions = [];
-    // 多种选择器兼容不同页面
     let qList = document.querySelectorAll('div[id^="question"].questionLi');
     if (qList.length === 0) qList = document.querySelectorAll('div[id^="question"]');
+    if (qList.length === 0) qList = document.querySelectorAll('.TiMu.newTiMu');
     if (qList.length === 0) qList = document.querySelectorAll('.TiMu.divQuestion');
     if (qList.length === 0) qList = document.querySelectorAll('.divQuestion');
 
@@ -79,48 +79,87 @@
       answered: false
     };
 
-    // 检查是否已答：选择题有选中状态
     question.answered = isAlreadyAnswered(el);
 
-    // 提取题型 + 题干
+    // --- 提取题型 + 题干 ---
+    // 方式1: 作业页 dowork 结构 (h3.mark_name > span.colorShallow)
     const h3 = el.querySelector('h3.mark_name, .mark_name, h3[class*="mark"]');
     if (h3) {
       const typeSpan = h3.querySelector('span.colorShallow, .colorShallow');
       if (typeSpan) {
         question.type = typeSpan.textContent.trim().replace(/[()（）\[\]【】]/g, '');
       }
-
       let titleText = h3.textContent;
       titleText = titleText.replace(/^\s*\d+\s*[.．、]\s*/, '');
-      titleText = titleText.replace(/\(?(单选题|多选题|判断题|填空题|简答题)\)?/g, '');
-      titleText = titleText.replace(/（[^）]*题）?/g, '');
+      titleText = titleText.replace(/[\[【\(（]?(单选题|多选题|判断题|填空题|简答题)[\]】\)）]?/g, '');
       titleText = titleText.replace(/\s+/g, ' ').trim();
       question.title = titleText;
-    } else {
-      // 备用：从整体文本提取
+    }
+
+    // 方式2: 课程内测页 doHomeWorkNew 结构 (div.Zy_TItle > span.newZy_TItle)
+    if (!question.title) {
+      const zyTitle = el.querySelector('div.Zy_TItle');
+      if (zyTitle) {
+        const typeSpan = zyTitle.querySelector('span.newZy_TItle');
+        if (typeSpan) {
+          question.type = typeSpan.textContent.trim().replace(/[\[【\(（）\]\)】]/g, '');
+        }
+        // 题干在 div.fontLabel 或直接在 Zy_TItle 下
+        const titleDiv = zyTitle.querySelector('div.fontLabel, div[class*="fontLabel"]') || zyTitle.querySelector('div.clearfix');
+        if (titleDiv) {
+          let titleText = titleDiv.textContent;
+          titleText = titleText.replace(/[\[【\(（]?(单选题|多选题|判断题|填空题|简答题)[\]】\)）]?/g, '');
+          titleText = titleText.replace(/\s+/g, ' ').trim();
+          question.title = titleText;
+        }
+      }
+    }
+
+    // 备用：从整体文本提取
+    if (!question.title) {
       const allText = el.textContent;
-      const match = allText.match(/(?:\d+[.．、]\s*)?\(?(单选题|多选题|判断题|填空题|简答题)\)?\s*(.+)/);
+      const match = allText.match(/(?:\d+[.．、]\s*)?[\[【\(（]?(单选题|多选题|判断题|填空题|简答题)[\]】\)）]?\s*(.+)/);
       if (match) {
         question.type = match[1];
         question.title = match[2].replace(/\s+/g, ' ').trim();
       }
     }
 
-    // 提取选项（div.answerBg 内，span.num_option 是字母，后面是选项文本）
+    // --- 提取选项 ---
+    // 方式1: 作业页 dowork 结构 (div.answerBg)
     const optionEls = el.querySelectorAll('div.answerBg');
     optionEls.forEach(optEl => {
       const letterSpan = optEl.querySelector('span.num_option');
       const letter = letterSpan ? letterSpan.getAttribute('data') || letterSpan.textContent.trim() : '';
-      // 选项文本：取 letterSpan 之后的内容
-      let optText = optEl.textContent.trim();
-      optText = optText.replace(/\s+/g, ' ');
-      if (optText) {
-        question.options.push(optText);
-      }
+      let optText = optEl.textContent.trim().replace(/\s+/g, ' ');
+      if (optText) question.options.push(optText);
     });
 
-    // 如果没提取到选项，尝试备用方式
+    // 方式2: 课程内测页 doHomeWorkNew 结构 (ul.Zy_ulTop > li)
     if (question.options.length === 0) {
+      const liOptions = el.querySelectorAll('ul.Zy_ulTop li, ul.Zy_ulTop > li');
+      liOptions.forEach(li => {
+        const letterSpan = li.querySelector('span.num_option');
+        const letter = letterSpan ? (letterSpan.getAttribute('data') || letterSpan.textContent.trim()) : '';
+        // 选项文本在 <a> 标签里
+        const aTag = li.querySelector('a.after, a[class*="after"]');
+        const optText = aTag ? aTag.textContent.trim() : li.textContent.replace(letter, '').trim();
+        if (letter || optText) {
+          question.options.push(letter + '. ' + optText);
+        }
+      });
+    }
+
+    // 备用选项提取
+    if (question.options.length === 0) {
+      const altOptions = el.querySelectorAll('li, label');
+      altOptions.forEach(opt => {
+        const optText = opt.textContent.trim();
+        if (optText && /^[A-Z][、.．\s]/.test(optText)) {
+          question.options.push(optText);
+        }
+      });
+    }
       const altOptions = el.querySelectorAll('ul.Zy_ulTop li, li.after, label.after');
       altOptions.forEach(opt => {
         const optText = opt.textContent.trim();
@@ -154,7 +193,11 @@
 
   // 检测题目是否已经作答
   function isAlreadyAnswered(el) {
-    // 选择题：检查是否有选中状态的选项
+    // 课程内测页: span.num_option 上有 check_answer class
+    const checkedClass = el.querySelector('span.num_option.check_answer');
+    if (checkedClass) return true;
+
+    // 作业页: div.answerBg 有 cur/checked/selected class
     const checkedOpt = el.querySelector('div.answerBg.cur, div.answerBg.checked, div.answerBg.selected');
     if (checkedOpt) return true;
 
@@ -162,7 +205,11 @@
     const checked = el.querySelector('input[type="radio"]:checked, input[type="checkbox"]:checked');
     if (checked) return true;
 
-    // 填空题：检查编辑器是否有内容
+    // 隐藏 input answer 有值（课程内测页存答案）
+    const answerInput = el.querySelector('input[name^="answer"][type="hidden"]');
+    if (answerInput && answerInput.value && answerInput.value.trim()) return true;
+
+    // 填空题：编辑器有内容
     const editable = el.querySelector('[contenteditable="true"]');
     if (editable && editable.textContent.trim().length > 0) return true;
 
@@ -441,22 +488,38 @@
 
   // 选择题：点击对应选项
   function fillChoice(question, answer) {
-    // 解析答案字母，支持 "A"、"AB"、"A,B"、"A、B"
     const letters = answer.replace(/[,，、\s]/g, '').split('').filter(c => /[A-Z]/i.test(c));
     let filled = 0;
 
+    // 方式1: 作业页 div.answerBg
     const optionEls = question.element.querySelectorAll('div.answerBg');
-    optionEls.forEach(optEl => {
-      const letterSpan = optEl.querySelector('span.num_option');
-      const letter = letterSpan ? (letterSpan.getAttribute('data') || letterSpan.textContent.trim()).toUpperCase() : '';
+    if (optionEls.length > 0) {
+      optionEls.forEach(optEl => {
+        const letterSpan = optEl.querySelector('span.num_option');
+        const letter = letterSpan ? (letterSpan.getAttribute('data') || letterSpan.textContent.trim()).toUpperCase() : '';
+        if (letters.includes(letter)) {
+          optEl.click();
+          filled++;
+        }
+      });
+      return filled > 0;
+    }
 
-      if (letters.includes(letter)) {
-        optEl.click();
-        filled++;
-      }
-    });
+    // 方式2: 课程内测页 ul.Zy_ulTop > li
+    const liOptions = question.element.querySelectorAll('ul.Zy_ulTop li');
+    if (liOptions.length > 0) {
+      liOptions.forEach(li => {
+        const letterSpan = li.querySelector('span.num_option');
+        const letter = letterSpan ? (letterSpan.getAttribute('data') || letterSpan.textContent.trim()).toUpperCase() : '';
+        if (letters.includes(letter)) {
+          li.click();
+          filled++;
+        }
+      });
+      return filled > 0;
+    }
 
-    return filled > 0;
+    return false;
   }
 
   // 判断题：匹配对/错选项

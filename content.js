@@ -773,11 +773,25 @@
 
   // ==================== 初始化 ====================
 
+  // 快速检查页面是否包含题目元素
+  function checkPageHasQuestions() {
+    if (document.querySelector('div[id^="question"]')) return true;
+    if (document.querySelector('.TiMu.newTiMu')) return true;
+    if (document.querySelector('.TiMu.divQuestion')) return true;
+    if (document.querySelector('div.answerBg')) return true;
+    if (document.querySelector('ul.Zy_ulTop')) return true;
+    if (document.querySelector('span.newZy_TItle')) return true;
+    if (document.querySelector('h3.mark_name')) return true;
+    return false;
+  }
+
   function init() {
     if (document.getElementById('xxt-float')) return;
 
-    // 页面可能是 SPA 动态渲染，等待 body 和内容出现
     if (!document.body || document.body.children.length === 0) return false;
+
+    // 没有题目元素的页面不注入浮窗
+    if (!checkPageHasQuestions()) return false;
 
     createFloatUI();
     log('插件已加载，点击「搜题」');

@@ -1,0 +1,16 @@
+{
+  "name": "xuexitong-auto-answer",
+  "version": "1.0.0",
+  "description": "基于 Chrome Extension Manifest V3 的学习通自动搜题插件，调用大语言模型（阿里百炼/OpenAI 兼容接口）搜索答案并自动填答。",
+  "main": "background.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "html2canvas": "^1.4.1",
+    "tesseract.js": "^7.0.0"
+  }
+}

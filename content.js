@@ -51,176 +51,9 @@
     });
   }
 
-  // ==================== font-cxsecret 字体解密 ====================
-
-  const CXSECRET_CACHE_KEY = 'xxt_cxsecret_map';
-  const CANVAS_SIZE = 32;
-  // 约 3000 个常用汉字
-  const COMMON_CHARS =
-    '的一是不了人我在有他这中大来上个国到说们为子和你地出会也时要就可以对生能而那得于着下自之年过发后作里用道行所然家种事成方多经么去法学如都同现当没动面起看定天分还进好小部其些主样理心她本前开但因只从想实日军者意无力它与长把机十民第公此已工使情明性知全三又关点正业外将两高间由问很最重并物手应战向头文体政美相见被利什二等产或新己制身果加西斯月话合回特代内信表化老给世位次度门任常先海通教儿原东声提立及比员解水名真论处走义各入几口认条平系气题活尔更别打女变四神总何电数安少报才结反受目太量再感建务做接必场件计管期市直德资命山金指克干排满西增则却石流统县难布思华收铁军确车调改转族城历千形极古组近花师央取奇举术款北且持住交推求细断朋怎格青空急织布局基影压质足注汉答读际规未响素约证议六止半食兴治张备济客留办积值府置步消越座整至配号群展权离支具论落始精红装适朝门请据须育便往今采列化完线万称原龙该众七角需走号类严条复建眼干形众清包各养程切百院近影指区老复按半青包各思养程列细角采青半华南层组终转号满争服写运输号影界满布收层效精具值验量展采统争完江切列区按养济复按列办备断各断收适效装争验适养装交需政术斗适效车具历育请落适际际界际际值际际际际际层装运界效确争据须响局争层满究断运形办运制阶术断线运究运程适形界线究线政适层度效制制度制际阶度运究究究术度制阶制究线运阶线究究运政制度线线运度线度阶政线制究度度运度度度线究阶政度度线度究度度度度度度度度度究度度度线究度度度线度度度究度度度度度度究度度度度度究度度度度度度度度度度度度度度度度度度度度度度度度度度度度度度度度度度度度度度度度度度度度度度度度度度度度度度度度度度度度度度度度度度度度度度度度度度度度度度度度度度度';
-
-  // 检测页面是否使用了 cxsecret 字体
-  function hasCxSecretFont() {
-    return !!document.getElementById('cxSecretStyle');
-  }
-
-  // 用 canvas 渲染字符，返回 Uint8Array 像素数据（只取 alpha 通道二值化）
-  function renderCharBitmap(char, fontFamily) {
-    const canvas = document.createElement('canvas');
-    const s = CANVAS_SIZE;
-    canvas.width = s;
-    canvas.height = s;
-    const ctx = canvas.getContext('2d');
-    ctx.clearRect(0, 0, s, s);
-    ctx.font = `20px "${fontFamily}", sans-serif`;
-    ctx.textBaseline = 'middle';
-    ctx.textAlign = 'center';
-    ctx.fillStyle = '#000';
-    ctx.fillText(char, s / 2, s / 2);
-    const imgData = ctx.getImageData(0, 0, s, s).data;
-    // 二值化：alpha > 80 → 1, 否则 0
-    const bits = new Uint8Array(s * s);
-    for (let i = 0; i < s * s; i++) {
-      bits[i] = imgData[i * 4 + 3] > 80 ? 1 : 0;
-    }
-    return bits;
-  }
-
-  // 计算两个位图的相似度（0~1，1 = 完全相同）
-  function bitmapSimilarity(a, b) {
-    let match = 0;
-    const len = a.length;
-    for (let i = 0; i < len; i++) {
-      if (a[i] === b[i]) match++;
-    }
-    return match / len;
-  }
-
-  // 构建 cxsecret 字符 → 明文字符的映射表
-  async function buildCxSecretMap() {
-    // 先尝试从缓存加载
-    try {
-      const cached = localStorage.getItem(CXSECRET_CACHE_KEY);
-      if (cached) {
-        const map = JSON.parse(cached);
-        if (map && Object.keys(map).length > 0) {
-          log(`[字体解密] 从缓存加载映射表 (${Object.keys(map).length} 条)`);
-          return map;
-        }
-      }
-    } catch { /* 缓存无效 */ }
-
-    // 等待字体加载完成
-    await document.fonts.ready;
-    // 额外等待确保字体对 canvas 可用
-    await new Promise(r => setTimeout(r, 500));
-
-    // 收集页面中实际出现的需要解密的字符
-    const allText = document.body.textContent;
-    const charSet = new Set();
-    for (const ch of allText) {
-      if (COMMON_CHARS.includes(ch) || /[\x00-\x7F]/.test(ch)) continue;
-      if (/[\u4e00-\u9fff]/.test(ch)) charSet.add(ch);
-    }
-
-    if (charSet.size === 0) {
-      log('[字体解密] 页面无加密字符');
-      return {};
-    }
-
-    log(`[字体解密] 发现 ${charSet.size} 个待解密字符，开始构建映射...`);
-
-    // 用标准字体渲染常用汉字，建立参考位图库
-    const refBitmaps = new Map();
-    for (const ch of COMMON_CHARS) {
-      if (!refBitmaps.has(ch)) {
-        refBitmaps.set(ch, renderCharBitmap(ch, 'sans-serif'));
-      }
-    }
-
-    // 用 cxsecret 字体渲染加密字符，找最佳匹配
-    const decryptMap = {};
-    const encryptedChars = [...charSet];
-
-    for (let ci = 0; ci < encryptedChars.length; ci++) {
-      const ch = encryptedChars[ci];
-      const secretBitmap = renderCharBitmap(ch, 'font-cxsecret');
-
-      let bestChar = null;
-      let bestSim = 0;
-
-      for (const [refChar, refBitmap] of refBitmaps) {
-        const sim = bitmapSimilarity(secretBitmap, refBitmap);
-        if (sim > bestSim) {
-          bestSim = sim;
-          bestChar = refChar;
-        }
-      }
-
-      // 相似度 > 90% 才采纳
-      if (bestSim > 0.9 && bestChar) {
-        decryptMap[ch] = bestChar;
-      }
-    }
-
-    const mapped = Object.keys(decryptMap).length;
-    log(`[字体解密] 映射完成: ${mapped}/${charSet.size} 个字符匹配 (阈值>90%)`);
-
-    // 缓存
-    if (mapped > 0) {
-      try {
-        localStorage.setItem(CXSECRET_CACHE_KEY, JSON.stringify(decryptMap));
-      } catch { /* 存储满等忽略 */ }
-    }
-
-    return decryptMap;
-  }
-
-  // 预加载：页面初始化时检测到 cxsecret 字体就提前构建映射
-  let cxSecretMapPromise = null;
-  let cxSecretDetected = false;
-
-  function prefetchCxSecretMap() {
-    if (cxSecretMapPromise || cxSecretDetected) return;
-    if (!hasCxSecretFont()) return;
-    cxSecretDetected = true;
-    log('[字体解密] 检测到 cxsecret 字体，预加载映射表...');
-    cxSecretMapPromise = buildCxSecretMap();
-  }
-
-  // 对文本应用解密映射
-  async function decryptCxSecretText(text) {
-    if (!text) return text;
-
-    // 如果页面没有 cxsecret 字体，直接返回原文
-    if (!cxSecretDetected && !hasCxSecretFont()) return text;
-
-    // 获取映射表（使用预加载结果或重新构建）
-    if (!cxSecretMapPromise) {
-      cxSecretDetected = true;
-      cxSecretMapPromise = buildCxSecretMap();
-    }
-
-    let decryptMap;
-    try {
-      decryptMap = await cxSecretMapPromise;
-    } catch {
-      return text;
-    }
-
-    if (!decryptMap || Object.keys(decryptMap).length === 0) return text;
-
-    // 逐字符替换
-    let result = '';
-    for (const ch of text) {
-      result += decryptMap[ch] || ch;
-    }
-    return result;
-  }
-
   // ==================== 题目提取 ====================
 
-  function extractQuestions() {
+  async function extractQuestions() {
     const questions = [];
     let qList = document.querySelectorAll('div[id^="question"].questionLi');
     if (qList.length === 0) qList = document.querySelectorAll('div[id^="question"]');
@@ -228,15 +61,15 @@
     if (qList.length === 0) qList = document.querySelectorAll('.TiMu.divQuestion');
     if (qList.length === 0) qList = document.querySelectorAll('.divQuestion');
 
-    qList.forEach((item, idx) => {
-      const q = extractOneQuestion(item, idx);
+    for (let idx = 0; idx < qList.length; idx++) {
+      const q = await extractOneQuestion(qList[idx], idx);
       if (q.title.trim()) questions.push(q);
-    });
+    }
 
     return questions;
   }
 
-  function extractOneQuestion(el, index) {
+  async function extractOneQuestion(el, index) {
     const question = {
       index: index + 1,
       type: '',
@@ -333,6 +166,60 @@
       question.type = guessQuestionType(el, question.options);
     }
 
+    // --- OCR 截图识别题目（处理字体加密等乱码场景） ---
+    if (window.xxtOcr && window.xxtOcr.isReady()) {
+      const hasCxSecret = !!document.getElementById('cxSecretStyle');
+      if (hasCxSecret) {
+        try {
+          // 截图识别题干区域
+          const titleEl = el.querySelector('div.Zy_TItle div.fontLabel, div.Zy_TItle div.clearfix, h3.mark_name')
+            || el.querySelector('div.Zy_TItle');
+          if (titleEl) {
+            const ocrTitle = await window.xxtOcr.recognizeElement(titleEl);
+            if (ocrTitle && ocrTitle.trim().length > 0) {
+              const cleaned = ocrTitle
+                .replace(/[\[【\(（]?\s*(单选题|多选题|判断题|填空题|简答题)\s*[\]】\)）]?/g, '')
+                .replace(/^\s*\d+\s*[.．、]\s*/, '')
+                .trim();
+              if (cleaned.length > 0) {
+                question.title = cleaned;
+              }
+            }
+          }
+
+          // 逐个选项截图识别（比整体截图更准确）
+          const liOptions = el.querySelectorAll('ul.Zy_ulTop > li');
+          if (liOptions.length > 0) {
+            const ocrOpts = [];
+            for (const li of liOptions) {
+              // 获取选项字母（A/B/C/D）
+              const letterSpan = li.querySelector('span.num_option');
+              const letter = letterSpan
+                ? (letterSpan.getAttribute('data') || letterSpan.textContent.trim()).toUpperCase()
+                : '';
+              // 截图识别选项内容
+              const optTextEl = li.querySelector('a.after, a[class*="after"]') || li.querySelector('div.after, span.after');
+              if (optTextEl) {
+                const ocrOpt = await window.xxtOcr.recognizeElement(optTextEl);
+                if (ocrOpt && ocrOpt.trim()) {
+                  ocrOpts.push((letter ? letter + '. ' : '') + ocrOpt.trim());
+                }
+              } else if (letter) {
+                // 回退：对整个 li 截图
+                const ocrLi = await window.xxtOcr.recognizeElement(li);
+                if (ocrLi && ocrLi.trim()) {
+                  ocrOpts.push(ocrLi.trim());
+                }
+              }
+            }
+            if (ocrOpts.length > 0) {
+              question.options = ocrOpts;
+            }
+          }
+        } catch (e) { /* OCR 失败时保留 DOM 提取结果 */ }
+      }
+    }
+
     return question;
   }
 
@@ -391,7 +278,7 @@
 
   let answerPanelVisible = false;
 
-  function toggleAnswerPanel() {
+  async function toggleAnswerPanel() {
     answerPanelVisible = !answerPanelVisible;
 
     let panel = document.getElementById('xxt-answer-panel');
@@ -402,16 +289,16 @@
     }
 
     if (answerPanelVisible) {
-      renderAnswerPanel(panel);
+      await renderAnswerPanel(panel);
       panel.classList.add('open');
     } else {
       panel.classList.remove('open');
     }
   }
 
-  function renderAnswerPanel(panel) {
+  async function renderAnswerPanel(panel) {
     const cache = loadCache();
-    const questions = extractQuestions();
+    const questions = await extractQuestions();
     const entries = questions.map(q => {
       const answer = cache[q.title];
       return { index: q.index, type: q.type, title: q.title, options: q.options, answer: answer || null };
@@ -464,17 +351,11 @@
       el.style.outlineOffset = '';
     });
 
-    const questions = extractQuestions();
+    const questions = await extractQuestions();
 
     if (questions.length === 0) {
       log('⚠ 未检测到任何题目');
       return;
-    }
-
-    // 对题目做字体解密
-    for (const q of questions) {
-      q.title = await decryptCxSecretText(q.title);
-      q.options = await Promise.all(q.options.map(opt => decryptCxSecretText(opt)));
     }
 
     log(`📋 解析到 ${questions.length} 道题目：`);
@@ -512,14 +393,11 @@
   async function startSearch() {
     if (isSearching) return;
 
-    const questions = extractQuestions();
+    const questions = await extractQuestions();
     if (questions.length === 0) {
       log('未检测到题目，请确认当前页面是作业页');
       return;
     }
-
-    // 预加载字体解密映射（如果页面使用了 cxsecret 字体）
-    prefetchCxSecretMap();
 
     isSearching = true;
     totalCount = questions.length;
@@ -545,10 +423,6 @@
           log(`[第${currentIndex}题] 已答过，跳过`);
           continue;
         }
-
-        // 对题干和选项做 cxsecret 字体解密
-        q.title = await decryptCxSecretText(q.title);
-        q.options = await Promise.all(q.options.map(opt => decryptCxSecretText(opt)));
 
         log(`[第${currentIndex}题] 📖 ${q.title.substring(0, 60)}${q.title.length > 60 ? '...' : ''}`);
 
@@ -643,7 +517,8 @@
   function autoFillAnswer(question, answer) {
     if (!question.element || !answer) return false;
 
-    const type = question.type;
+    const type = question.type.replace(/\s/g, '');
+    log(`[填答] 题型="${type}" 答案="${answer}"`);
 
     if (type === '单选题' || type === '多选题') {
       return fillChoice(question, answer);
@@ -657,12 +532,18 @@
       return fillBlank(question, answer);
     }
 
+    // 答案以字母开头且不是判断，按选择题处理
+    if (/^[A-Z]+$/i.test(answer.replace(/[,，、\s]/g, '')) && answer.replace(/[,，、\s]/g, '').length <= 4) {
+      return fillChoice(question, answer);
+    }
+
     return false;
   }
 
   // 选择题：点击对应选项
   function fillChoice(question, answer) {
     const letters = answer.replace(/[,，、\s]/g, '').split('').filter(c => /[A-Z]/i.test(c));
+    log(`[填答] 需要选择: ${letters.join(',')}`);
     let filled = 0;
 
     // 方式1: 作业页 div.answerBg
@@ -682,10 +563,43 @@
     // 方式2: 课程内测页 ul.Zy_ulTop > li
     const liOptions = question.element.querySelectorAll('ul.Zy_ulTop li');
     if (liOptions.length > 0) {
-      liOptions.forEach(li => {
+      liOptions.forEach((li, idx) => {
+        // 获取选项字母
         const letterSpan = li.querySelector('span.num_option');
-        const letter = letterSpan ? (letterSpan.getAttribute('data') || letterSpan.textContent.trim()).toUpperCase() : '';
+        let letter = '';
+
+        if (letterSpan) {
+          letter = (letterSpan.getAttribute('data') || letterSpan.textContent.trim()).toUpperCase();
+        }
+        if (!letter) {
+          const textMatch = li.textContent.trim().match(/^([A-Z])[、.．\s]/);
+          if (textMatch) letter = textMatch[1];
+        }
+        if (!letter && idx < 4) {
+          letter = String.fromCharCode(65 + idx);
+        }
+
+        log(`[填答] 检测到选项: ${letter}，需匹配: ${letters.includes(letter)}`);
+
         if (letters.includes(letter)) {
+          // 方式A：直接触发底层 input[radio/checkbox]
+          const input = li.querySelector('input[type="radio"], input[type="checkbox"]');
+          if (input && !input.checked) {
+            input.checked = true;
+            input.dispatchEvent(new Event('change', { bubbles: true }));
+            input.dispatchEvent(new Event('click', { bubbles: true }));
+            filled++;
+            return;
+          }
+
+          // 方式B：触发 span.num_option 的 click（学习通内测页选中逻辑挂在这里）
+          if (letterSpan) {
+            letterSpan.click();
+            filled++;
+            return;
+          }
+
+          // 方式C：直接操作 li
           li.click();
           filled++;
         }
@@ -693,27 +607,32 @@
       return filled > 0;
     }
 
+    log(`[填答] 未找到可点击的选项元素`);
     return false;
   }
 
   // 判断题：匹配对/错选项
   function fillJudgement(question, answer) {
-    const optionEls = question.element.querySelectorAll('div.answerBg');
-    const target = /对|正确|✓|√|true|T/i.test(answer) ? '对' : '错';
+    const isRight = /对|正确|✓|√|true|T/i.test(answer);
 
-    for (const optEl of optionEls) {
-      const text = optEl.textContent.trim();
-      if (text.includes(target) || (target === '对' && /正确|✓|√/.test(text))) {
-        optEl.click();
-        return true;
+    // 判断题关键词：对/错、TRUE/FALSE、是/否、正确/错误
+    const rightWords = ['对', '正确', '是', 'true', 'TRUE', '√', '✓', 'yes', 'YES', 'right'];
+    const wrongWords = ['错', '错误', '否', 'false', 'FALSE', '×', '✗', 'no', 'NO', 'wrong'];
+    const targetWords = isRight ? rightWords : wrongWords;
+
+    // 方式1: 作业页 div.answerBg
+    const optionEls = question.element.querySelectorAll('div.answerBg');
+    if (optionEls.length > 0) {
+      for (const optEl of optionEls) {
+        const text = optEl.textContent.trim().toUpperCase();
+        if (targetWords.some(w => text.includes(w.toUpperCase()))) {
+          optEl.click();
+          return true;
+        }
       }
-    }
-    // 备用：直接按字母选（A=对 B=错 的惯例）
-    const letterSpan = question.element.querySelector('div.answerBg span.num_option');
-    if (letterSpan) {
-      const letter = target === '对' ? 'A' : 'B';
-      const optEls = question.element.querySelectorAll('div.answerBg');
-      for (const optEl of optEls) {
+      // 按字母：A=对 B=错
+      const letter = isRight ? 'A' : 'B';
+      for (const optEl of optionEls) {
         const l = optEl.querySelector('span.num_option');
         const data = l ? (l.getAttribute('data') || l.textContent.trim()).toUpperCase() : '';
         if (data === letter) {
@@ -722,26 +641,67 @@
         }
       }
     }
+
+    // 方式2: 课程内测页 ul.Zy_ulTop > li
+    const liOptions = question.element.querySelectorAll('ul.Zy_ulTop li');
+    if (liOptions.length > 0) {
+      for (const li of liOptions) {
+        const text = li.textContent.trim().toUpperCase();
+        log(`[填答] 判断题选项文本: ${text}`);
+        if (targetWords.some(w => text.includes(w.toUpperCase()))) {
+          // 点击选项
+          const input = li.querySelector('input[type="radio"], input[type="checkbox"]');
+          if (input && !input.checked) {
+            input.checked = true;
+            input.dispatchEvent(new Event('change', { bubbles: true }));
+            input.dispatchEvent(new Event('click', { bubbles: true }));
+            return true;
+          }
+          const letterSpan = li.querySelector('span.num_option');
+          if (letterSpan) { letterSpan.click(); return true; }
+          li.click();
+          return true;
+        }
+      }
+
+      // 回退：第一个 li = 对，第二个 li = 错
+      const idx = isRight ? 0 : 1;
+      if (liOptions[idx]) {
+        const input = liOptions[idx].querySelector('input[type="radio"], input[type="checkbox"]');
+        if (input && !input.checked) {
+          input.checked = true;
+          input.dispatchEvent(new Event('change', { bubbles: true }));
+          input.dispatchEvent(new Event('click', { bubbles: true }));
+          return true;
+        }
+        liOptions[idx].click();
+        return true;
+      }
+    }
+
     return false;
   }
 
-  // 填空题：向 UEditor 插入文本
+  // 填空题：向编辑器插入文本
   function fillBlank(question, answer) {
-    // 多个空用 | 分隔
     const blanks = answer.split('|').map(s => s.trim());
-    // 每个 .Answer 对应一个空
-    const answerDivs = question.element.querySelectorAll('div.Answer');
-
     let filled = 0;
+
+    // 收集所有可能的填空输入区域
+    let answerDivs = question.element.querySelectorAll('div.Answer');
+    // 课程内测页：填空区域可能是 div.answerTip 或 div.write-tip-wrap
+    if (answerDivs.length === 0) {
+      answerDivs = question.element.querySelectorAll('div.answerTip, div.write-tip-wrap, div[id^="answer"]');
+    }
+
     answerDivs.forEach((div, i) => {
       const text = blanks[i] || blanks[0] || '';
       if (!text) return;
 
-      // 方式1：尝试 UEditor API（学习通用 UEditor 富文本编辑器）
+      // 方式1：UEditor API
       const editorDiv = div.querySelector('.edui-editor');
       if (editorDiv) {
         const editorId = editorDiv.id;
-        // UE.getEditor(id).setContent(text)
         try {
           if (window.UE && typeof UE.getEditor === 'function') {
             const editor = UE.getEditor(editorId);
@@ -751,9 +711,9 @@
               return;
             }
           }
-        } catch (e) { /* 降级处理 */ }
+        } catch (e) { /* 降级 */ }
 
-        // 方式2：直接操作 contenteditable
+        // contenteditable
         const editable = div.querySelector('[contenteditable="true"]');
         if (editable) {
           editable.textContent = text;
@@ -762,50 +722,82 @@
           return;
         }
 
-        // 方式3：操作 iframe
+        // iframe
         const iframe = div.querySelector('iframe');
         if (iframe && iframe.contentDocument) {
-          const body = iframe.contentDocument.body;
-          body.textContent = text;
-          body.dispatchEvent(new Event('input', { bubbles: true }));
+          iframe.contentDocument.body.textContent = text;
+          iframe.contentDocument.body.dispatchEvent(new Event('input', { bubbles: true }));
           filled++;
           return;
         }
       }
 
-      // 备用：普通 input/textarea
-      const input = div.querySelector('input[type="text"], textarea');
+      // 方式2：课程内测页 textarea（在 div 内或紧邻）
+      const textarea = div.querySelector('textarea');
+      if (textarea) {
+        const setter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')?.set;
+        if (setter) setter.call(textarea, text);
+        else textarea.value = text;
+        textarea.dispatchEvent(new Event('input', { bubbles: true }));
+        textarea.dispatchEvent(new Event('change', { bubbles: true }));
+        filled++;
+        return;
+      }
+
+      // 方式3：普通 input
+      const input = div.querySelector('input[type="text"]');
       if (input) {
-        // React/Vue 需要触发原生 setter
-        const nativeSetter = Object.getOwnPropertyDescriptor(
-          window.HTMLInputElement.prototype, 'value'
-        )?.set || Object.getOwnPropertyDescriptor(
-          window.HTMLTextAreaElement.prototype, 'value'
-        )?.set;
-        if (nativeSetter) {
-          nativeSetter.call(input, text);
-        } else {
-          input.value = text;
-        }
+        const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set;
+        if (setter) setter.call(input, text);
+        else input.value = text;
         input.dispatchEvent(new Event('input', { bubbles: true }));
         input.dispatchEvent(new Event('change', { bubbles: true }));
         filled++;
+        return;
       }
     });
 
+    // 回退：在整个题目元素中找 input/textarea
+    if (filled === 0) {
+      const inputs = question.element.querySelectorAll('input[type="text"], textarea');
+      inputs.forEach((input, i) => {
+        const text = blanks[i] || blanks[0] || '';
+        if (!text) return;
+        const setter = Object.getOwnPropertyDescriptor(
+          (input.tagName === 'TEXTAREA' ? HTMLTextAreaElement : HTMLInputElement).prototype, 'value'
+        )?.set;
+        if (setter) setter.call(input, text);
+        else input.value = text;
+        input.dispatchEvent(new Event('input', { bubbles: true }));
+        input.dispatchEvent(new Event('change', { bubbles: true }));
+        filled++;
+      });
+    }
+
+    log(`[填答] 填空题: ${filled} 个空已填入`);
     return filled > 0;
   }
 
   // 一键填答所有已有答案的题目
   async function autoFillAll() {
-    const questions = extractQuestions();
+    const questions = await extractQuestions();
     const cache = loadCache();
     let filled = 0, failed = 0;
 
     log(`📝 开始自动填答，共 ${questions.length} 题`);
 
     for (const q of questions) {
-      const answer = cache[q.title];
+      // 先精确匹配，再模糊匹配（OCR 两次结果可能略有差异）
+      let answer = cache[q.title];
+      if (!answer) {
+        const qTitleClean = q.title.replace(/\s/g, '');
+        for (const [k, v] of Object.entries(cache)) {
+          if (k.replace(/\s/g, '') === qTitleClean) {
+            answer = v;
+            break;
+          }
+        }
+      }
       if (!answer) {
         log(`[第${q.index}题] ⏭ 无答案，跳过`);
         continue;
@@ -841,6 +833,328 @@
     }
   }
 
+  // ==================== OCR 手动识别 ====================
+
+  async function ocrCurrentQuestions() {
+    if (!window.xxtOcr) {
+      log('❌ OCR 模块未加载，请刷新页面后重试');
+      return;
+    }
+
+    if (!window.xxtOcr.isReady()) {
+      log('❌ OCR 引擎未就绪（tesseract.js 或 html2canvas 未加载），请刷新页面后重试');
+      return;
+    }
+
+    // 不走 extractQuestions（里面也会 OCR），直接拿 DOM 元素
+    let qList = document.querySelectorAll('div[id^="question"].questionLi');
+    if (qList.length === 0) qList = document.querySelectorAll('div[id^="question"]');
+    if (qList.length === 0) qList = document.querySelectorAll('.TiMu.newTiMu');
+    if (qList.length === 0) qList = document.querySelectorAll('.TiMu.divQuestion');
+    if (qList.length === 0) qList = document.querySelectorAll('.divQuestion');
+
+    if (qList.length === 0) {
+      log('⚠ 未检测到题目');
+      return;
+    }
+
+    log(`📷 发现 ${qList.length} 道题，开始 OCR 截图识别...`);
+    let recognized = 0;
+
+    for (let idx = 0; idx < qList.length; idx++) {
+      const el = qList[idx];
+      log(`[第${idx + 1}题] 📷 正在截图识别...`);
+
+      let ocrTitle = null;
+      const ocrOpts = [];
+
+      // 截图识别题干区域
+      const titleEl = el.querySelector('div.Zy_TItle div.fontLabel, div.Zy_TItle div.clearfix, h3.mark_name')
+        || el.querySelector('div.Zy_TItle');
+      if (titleEl) {
+        ocrTitle = await window.xxtOcr.recognizeElement(titleEl);
+        if (ocrTitle) {
+          ocrTitle = ocrTitle
+            .replace(/[\[【\(（]?\s*(单选题|多选题|判断题|填空题|简答题)\s*[\]】\)）]?/g, '')
+            .replace(/^\s*\d+\s*[.．、]\s*/, '')
+            .trim();
+        }
+      }
+
+      // 逐个选项截图识别
+      const liOptions = el.querySelectorAll('ul.Zy_ulTop > li');
+      if (liOptions.length > 0) {
+        for (const li of liOptions) {
+          const letterSpan = li.querySelector('span.num_option');
+          const letter = letterSpan
+            ? (letterSpan.getAttribute('data') || letterSpan.textContent.trim()).toUpperCase()
+            : '';
+          const optTextEl = li.querySelector('a.after, a[class*="after"]') || li.querySelector('div.after, span.after');
+          if (optTextEl) {
+            const ocrOpt = await window.xxtOcr.recognizeElement(optTextEl);
+            if (ocrOpt && ocrOpt.trim()) {
+              ocrOpts.push((letter ? letter + '. ' : '') + ocrOpt.trim());
+            }
+          } else if (letter) {
+            const ocrLi = await window.xxtOcr.recognizeElement(li);
+            if (ocrLi && ocrLi.trim()) {
+              ocrOpts.push(ocrLi.trim());
+            }
+          }
+        }
+      }
+
+      // 如果题干和选项都没拿到，尝试对整题截图
+      if (!ocrTitle && ocrOpts.length === 0) {
+        const fullText = await window.xxtOcr.recognizeElement(el);
+        if (fullText) {
+          ocrTitle = fullText;
+        }
+      }
+
+      if (ocrTitle || ocrOpts.length > 0) {
+        recognized++;
+        const display = [ocrTitle, ...ocrOpts].filter(Boolean).join(' | ');
+        log(`[第${idx + 1}题] ✅ ${display.substring(0, 100)}${display.length > 100 ? '...' : ''}`);
+
+        // 显示到页面上
+        const oldTag = el.querySelector('.xxt-ocr-tag');
+        if (oldTag) oldTag.remove();
+        const tag = document.createElement('div');
+        tag.className = 'xxt-ocr-tag';
+        let tagHtml = '';
+        if (ocrTitle) tagHtml += `<strong>题干:</strong> ${escapeHtml(ocrTitle)}`;
+        if (ocrOpts.length > 0) {
+          tagHtml += (ocrTitle ? '<br>' : '') + `<strong>选项:</strong> ` + ocrOpts.map(o => escapeHtml(o)).join(' | ');
+        }
+        tag.innerHTML = tagHtml;
+        el.appendChild(tag);
+      } else {
+        log(`[第${idx + 1}题] ❌ OCR 未识别到文字`);
+      }
+    }
+
+    log(`📊 OCR 完成: 成功识别 ${recognized}/${qList.length} 题`);
+  }
+
+  // ==================== 一键流程：OCR → 搜题 → 填答 ====================
+
+  async function oneClickFlow() {
+    if (isSearching) return;
+    if (!window.xxtOcr || !window.xxtOcr.isReady()) {
+      log('❌ OCR 引擎未就绪，请刷新页面后重试');
+      return;
+    }
+
+    const settings = await sendToBackground('getSettings');
+    if (!settings.apiKey) {
+      log('❌ 未配置 API Key，请先在设置中填入');
+      return;
+    }
+
+    // 获取题目 DOM 元素
+    let qList = document.querySelectorAll('div[id^="question"].questionLi');
+    if (qList.length === 0) qList = document.querySelectorAll('div[id^="question"]');
+    if (qList.length === 0) qList = document.querySelectorAll('.TiMu.newTiMu');
+    if (qList.length === 0) qList = document.querySelectorAll('.TiMu.divQuestion');
+    if (qList.length === 0) qList = document.querySelectorAll('.divQuestion');
+
+    if (qList.length === 0) {
+      log('⚠ 未检测到题目');
+      return;
+    }
+
+    isSearching = true;
+    totalCount = qList.length;
+    currentIndex = 0;
+    questionResults.clear();
+    updateFloatBtn();
+
+    log(`🚀 一键流程启动，共 ${totalCount} 题`);
+    log('─── 第1步: OCR 识别 ───');
+
+    const delay = settings.delay || 800;
+    let ocrSuccess = 0;
+
+    try {
+      // 阶段1: OCR 识别所有题目
+      const ocrResults = [];
+      for (let idx = 0; idx < qList.length; idx++) {
+        if (!isSearching) break;
+        currentIndex = idx + 1;
+        updateFloatBtn();
+
+        const el = qList[idx];
+        log(`[第${currentIndex}题] 📷 OCR 识别中...`);
+
+        let ocrTitle = null;
+        const ocrOpts = [];
+        let questionType = '';
+
+        // 截图识别题干
+        const titleEl = el.querySelector('div.Zy_TItle div.fontLabel, div.Zy_TItle div.clearfix, h3.mark_name')
+          || el.querySelector('div.Zy_TItle');
+        if (titleEl) {
+          ocrTitle = await window.xxtOcr.recognizeElement(titleEl);
+          if (ocrTitle) {
+            // 提取题型
+            const typeMatch = ocrTitle.match(/[\[【\(（]?\s*(单选题|多选题|判断题|填空题|简答题)\s*[\]】\)）]?/);
+            if (typeMatch) questionType = typeMatch[1];
+            ocrTitle = ocrTitle
+              .replace(/[\[【\(（]?\s*(单选题|多选题|判断题|填空题|简答题)\s*[\]】\)）]?/g, '')
+              .replace(/^\s*\d+\s*[.．、]\s*/, '')
+              .trim();
+          }
+        }
+
+        // 逐个选项截图识别
+        const liOptions = el.querySelectorAll('ul.Zy_ulTop > li');
+        if (liOptions.length > 0) {
+          for (const li of liOptions) {
+            const letterSpan = li.querySelector('span.num_option');
+            const letter = letterSpan
+              ? (letterSpan.getAttribute('data') || letterSpan.textContent.trim()).toUpperCase()
+              : '';
+            const optTextEl = li.querySelector('a.after, a[class*="after"]') || li.querySelector('div.after, span.after');
+            if (optTextEl) {
+              const ocrOpt = await window.xxtOcr.recognizeElement(optTextEl);
+              if (ocrOpt && ocrOpt.trim()) {
+                ocrOpts.push((letter ? letter + '. ' : '') + ocrOpt.trim());
+              }
+            } else if (letter) {
+              const ocrLi = await window.xxtOcr.recognizeElement(li);
+              if (ocrLi && ocrLi.trim()) {
+                ocrOpts.push(ocrLi.trim());
+              }
+            }
+          }
+        }
+
+        if (!questionType) {
+          questionType = guessQuestionType(el, ocrOpts);
+        }
+
+        if (ocrTitle || ocrOpts.length > 0) {
+          ocrSuccess++;
+          log(`[第${currentIndex}题] ✅ ${ocrTitle ? ocrTitle.substring(0, 50) : '(无题干)'}`);
+        }
+
+        // 显示 OCR 结果到页面
+        const oldTag = el.querySelector('.xxt-ocr-tag');
+        if (oldTag) oldTag.remove();
+        const tag = document.createElement('div');
+        tag.className = 'xxt-ocr-tag';
+        let tagHtml = '';
+        if (ocrTitle) tagHtml += `<strong>题干:</strong> ${escapeHtml(ocrTitle)}`;
+        if (ocrOpts.length > 0) {
+          tagHtml += (ocrTitle ? '<br>' : '') + `<strong>选项:</strong> ` + ocrOpts.map(o => escapeHtml(o)).join(' | ');
+        }
+        tag.innerHTML = tagHtml;
+        el.appendChild(tag);
+
+        ocrResults.push({ el, ocrTitle, ocrOpts, questionType, answered: isAlreadyAnswered(el) });
+      }
+
+      log(`📊 OCR 完成: ${ocrSuccess}/${totalCount} 题`);
+
+      // 阶段2: AI 搜题
+      log('─── 第2步: AI 搜题 ───');
+      let searchSuccess = 0;
+
+      for (let i = 0; i < ocrResults.length; i++) {
+        if (!isSearching) break;
+        const item = ocrResults[i];
+
+        if (item.answered) {
+          log(`[第${i + 1}题] 已答过，跳过`);
+          continue;
+        }
+
+        if (!item.ocrTitle) {
+          log(`[第${i + 1}题] ⏭ 无题干，跳过`);
+          continue;
+        }
+
+        // 查缓存
+        const cached = getCacheAnswer(item.ocrTitle);
+        if (cached) {
+          log(`[第${i + 1}题] ✅ 答案: ${cached} [缓存]`);
+          questionResults.set(i + 1, { status: 'success', answer: cached });
+          renderAnswerTag({ element: item.el }, { answer: cached });
+          searchSuccess++;
+          continue;
+        }
+
+        log(`[第${i + 1}题] 🔍 搜索答案...`);
+        const result = await sendToBackground('solve', {
+          title: item.ocrTitle,
+          options: item.ocrOpts,
+          type: item.questionType
+        });
+
+        if (!isSearching) break;
+
+        if (result.error) {
+          log(`[第${i + 1}题] ❌ 搜索失败: ${result.error}`);
+          questionResults.set(i + 1, { status: 'fail', answer: null });
+          continue;
+        }
+
+        log(`[第${i + 1}题] ✅ 答案: ${result.answer}`);
+        setCacheAnswer(item.ocrTitle, result.answer);
+        questionResults.set(i + 1, { status: 'success', answer: result.answer });
+        renderAnswerTag({ element: item.el }, result);
+        searchSuccess++;
+
+        // 存到 ocrResults 中供填答使用
+        item.answer = result.answer;
+
+        if (i < ocrResults.length - 1 && isSearching) {
+          await abortableDelay(delay);
+        }
+      }
+
+      log(`📊 搜题完成: 成功 ${searchSuccess} 题`);
+
+      // 阶段3: 自动填答
+      log('─── 第3步: 自动填答 ───');
+      let filled = 0, failed = 0;
+
+      for (let i = 0; i < ocrResults.length; i++) {
+        const item = ocrResults[i];
+        if (!item.answer || item.answered) continue;
+
+        const q = {
+          index: i + 1,
+          type: item.questionType,
+          element: item.el
+        };
+        const ok = autoFillAnswer(q, item.answer);
+        if (ok) {
+          log(`[第${i + 1}题] ✅ 已填答: ${item.answer}`);
+          filled++;
+        } else {
+          log(`[第${i + 1}题] ❌ 填答失败`);
+          failed++;
+        }
+
+        await new Promise(r => setTimeout(r, 300));
+      }
+
+      log(`📊 填答完成: 成功 ${filled} | 失败 ${failed}`);
+      if (isSearching) {
+        log('🎉 一键流程全部完成！');
+        showSummary();
+      }
+    } catch (err) {
+      log('❌ 运行错误: ' + err.message);
+    } finally {
+      isSearching = false;
+      totalCount = currentIndex;
+      updateFloatBtn();
+    }
+  }
+
   // ==================== 浮动 UI ====================
 
   function createFloatUI() {
@@ -856,7 +1170,9 @@
         <div id="xxt-float-actions">
           <button id="xxt-float-start">搜题</button>
           <button id="xxt-float-fill">填答</button>
+          <button id="xxt-float-oneclick">一键</button>
           <button id="xxt-float-preview">预览</button>
+          <button id="xxt-float-ocr">OCR</button>
           <button id="xxt-float-answers">答案</button>
         </div>
         <div id="xxt-float-log"></div>
@@ -873,6 +1189,14 @@
       }
     });
     document.getElementById('xxt-float-preview').addEventListener('click', previewQuestions);
+    document.getElementById('xxt-float-ocr').addEventListener('click', ocrCurrentQuestions);
+    document.getElementById('xxt-float-oneclick').addEventListener('click', () => {
+      if (isSearching) {
+        stopSearch();
+      } else {
+        oneClickFlow();
+      }
+    });
     document.getElementById('xxt-float-answers').addEventListener('click', toggleAnswerPanel);
     document.getElementById('xxt-float-fill').addEventListener('click', autoFillAll);
 
@@ -977,9 +1301,6 @@
 
     createFloatUI();
     log('插件已加载，点击「搜题」');
-
-    // 检测 cxsecret 字体并预加载解密映射
-    prefetchCxSecretMap();
 
     return true;
   }

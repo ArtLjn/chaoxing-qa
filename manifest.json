@@ -34,7 +34,7 @@
         "https://mooc1-2.chaoxing.com/mooc-ans/work/doHomeWorkNew*",
         "https://mooc1.chaoxing.com/ananas/modules/work/*"
       ],
-      "js": ["content.js"],
+      "js": ["lib/html2canvas.min.js", "lib/tesseract.min.js", "ocr.js", "content.js"],
       "css": ["content.css"],
       "run_at": "document_idle",
       "all_frames": true

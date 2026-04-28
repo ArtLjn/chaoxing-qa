@@ -125,6 +125,42 @@
   border-color: #533483;
 }
 
+#xxt-float-oneclick {
+  flex: 1;
+  padding: 10px 4px;
+  border: 1px solid #2a4a2a;
+  border-radius: 8px;
+  background: linear-gradient(135deg, #0f3460, #1a6b3c);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+#xxt-float-oneclick:hover {
+  background: linear-gradient(135deg, #16213e, #27ae60);
+  border-color: #27ae60;
+}
+
+#xxt-float-ocr {
+  flex: 1;
+  padding: 10px 4px;
+  border: 1px solid #2a2a4a;
+  border-radius: 8px;
+  background: #16213e;
+  color: #e74c3c;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+#xxt-float-ocr:hover {
+  background: #1e2a4a;
+  border-color: #e74c3c;
+}
+
 #xxt-float-answers {
   flex: 1;
   padding: 10px 4px;
@@ -336,4 +372,21 @@
 
 .xxt-debug-tag b {
   color: #533483;
+}
+
+/* OCR 识别结果标签 */
+.xxt-ocr-tag {
+  margin: 8px 0;
+  padding: 8px 12px;
+  background: rgba(231, 76, 60, 0.1);
+  border-left: 3px solid #e74c3c;
+  border-radius: 4px;
+  font-size: 13px;
+  color: #333;
+  line-height: 1.6;
+}
+
+.xxt-ocr-tag strong {
+  color: #e74c3c;
+  font-size: 14px;
 }

@@ -1,24 +1,26 @@
 # XXT Assistant - 学习通搜题助手
 
-基于 Chrome Extension Manifest V3 的学习通自动搜题插件，调用大语言模型（阿里百炼/OpenAI 兼容接口）搜索答案并自动填答。
+基于 Chrome Extension Manifest V3 的学习通自动搜题插件，调用大语言模型（阿里百炼/OpenAI 兼容接口）搜索答案并自动填答。支持 OCR 识别字体加密的课程内测页题目。
 
 ## 功能特性
 
 - 自动识别学习通作业页面的全部题目（单选/多选/判断/填空）
+- **OCR 识别**：通过 tesseract.js + html2canvas 截图识别字体加密的课程内测页题目
+- 一键流程：OCR 识别 → AI 搜题 → 自动填答
 - 调用 AI 模型搜索答案，支持自定义模型和 API 地址
 - 答案本地缓存（localStorage），重复题目直接命中
-- 自动填答：选择题点击选项、填空题插入文本（支持 UEditor 富文本编辑器）
+- 自动填答：选择题点击选项、判断题匹配对错、填空题插入文本（支持 UEditor）
 - 可拖拽浮动控制面板 + 实时日志
 - 答案缓存面板，随时查看历史答案
 
 ## 支持的题型
 
-| 题型 | 提取 | 填答 |
-|------|:----:|:----:|
-| 单选题 | ✅ | ✅ |
-| 多选题 | ✅ | ✅ |
-| 判断题 | ✅ | ✅ |
-| 填空题 | ✅ | ✅ |
+| 题型 | DOM 提取 | OCR 识别 | 自动填答 |
+|------|:--------:|:--------:|:--------:|
+| 单选题 | ✅ | ✅ | ✅ |
+| 多选题 | ✅ | ✅ | ✅ |
+| 判断题 | ✅ | ✅ | ✅ |
+| 填空题 | ✅ | ✅ | ✅ |
 
 ## 安装
 
@@ -28,10 +30,19 @@
 git clone https://github.com/ArtLjn/xuexitong-auto-answer.git
 ```
 
-2. 打开 Chrome，地址栏输入 `chrome://extensions`
-3. 开启右上角 **开发者模式**
-4. 点击 **加载已解压的扩展程序**，选择项目文件夹
-5. 插件图标出现在浏览器工具栏
+2. 安装依赖（打包 OCR 库到扩展中）
+
+```bash
+npm install
+cp node_modules/tesseract.js/dist/tesseract.min.js lib/
+cp node_modules/tesseract.js/dist/worker.min.js lib/
+cp node_modules/html2canvas/dist/html2canvas.min.js lib/
+```
+
+3. 打开 Chrome，地址栏输入 `chrome://extensions`
+4. 开启右上角 **开发者模式**
+5. 点击 **加载已解压的扩展程序**，选择项目文件夹
+6. 插件图标出现在浏览器工具栏
 
 ## 使用
 
@@ -48,24 +59,29 @@ git clone https://github.com/ArtLjn/xuexitong-auto-answer.git
 
 > 阿里百炼 API Key 获取：[阿里云控制台](https://dashscope.console.aliyun.com/) → DashScope → API-KEY 管理
 
-### 2. 搜题
+### 2. 一键流程
 
-1. 打开学习通作业/考试页面
-2. 页面右下角出现浮动面板
-3. 点击 **「搜题」** 按钮，自动提取全部题目并逐题搜索答案
-4. 搜索完成后答案显示在每道题旁边
+打开课程内测页或作业页面，点击 **「一键」** 按钮，自动完成：
 
-### 3. 填答
+1. **OCR 识别** — 截图识别每题题干和选项（处理字体加密乱码）
+2. **AI 搜题** — 调用大语言模型搜索答案
+3. **自动填答** — 将答案填入页面
 
-搜题完成后点击 **「填答」** 按钮，自动将缓存中的答案填入页面：
+### 3. 分步操作
 
-- 选择题 → 自动点击对应选项
-- 判断题 → 自动点击"对"或"错"
-- 填空题 → 自动向 UEditor 编辑器插入文本（多空用 `|` 分隔）
+也可以单独使用各功能：
 
-### 4. 查看答案
+- **搜题** — 提取题目并逐题搜索答案（普通作业页用 DOM 提取，加密页面自动走 OCR）
+- **填答** — 将缓存中的答案自动填入页面
+- **OCR** — 手动对所有题目进行截图识别，结果显示在页面
+- **预览** — 查看解析出的题目和选项
+- **答案** — 打开侧边面板查看所有已缓存答案
 
-点击 **「答案」** 按钮打开侧边面板，查看所有已缓存的答案。
+### 填答说明
+
+- 单选题/多选题 → 自动点击对应选项（支持底层 input / span / li 三级点击）
+- 判断题 → 匹配对/错/TRUE/FALSE，自动选中
+- 填空题 → 向 UEditor / textarea / input 插入文本（多空用 `|` 分隔）
 
 ## 项目结构
 
@@ -73,8 +89,13 @@ git clone https://github.com/ArtLjn/xuexitong-auto-answer.git
 xuexitong-auto-answer/
 ├── manifest.json           # Manifest V3 配置
 ├── background.js           # Service Worker（API 调用、缓存、重试）
-├── content.js              # 内容脚本（题目提取、UI、自动填答）
-├── content.css             # 浮动面板 + 答案面板样式
+├── content.js              # 内容脚本（题目提取、UI、自动填答、一键流程）
+├── content.css             # 浮动面板 + 答案面板 + OCR 标签样式
+├── ocr.js                  # OCR 模块（tesseract.js + html2canvas 封装）
+├── lib/                    # 第三方库（打包到扩展中，避免 CSP 问题）
+│   ├── tesseract.min.js
+│   ├── worker.min.js
+│   └── html2canvas.min.js
 ├── popup/
 │   ├── popup.html          # 设置页
 │   ├── popup.js            # 设置页逻辑
@@ -84,6 +105,16 @@ xuexitong-auto-answer/
     ├── icon48.png
     └── icon128.png
 ```
+
+## OCR 识别原理
+
+课程内测页使用 `font-cxsecret` 加密字体，DOM 中的文本是乱码。插件通过以下方式解决：
+
+1. **html2canvas** — 将题干区域和选项区域截图为 Canvas
+2. **tesseract.js** — 对截图进行 OCR 文字识别（中文简体）
+3. **文本后处理** — 去除加密字体导致的字间多余空格，清洗题型前缀
+
+库文件通过 manifest.json 的 `content_scripts.js` 静态注入，避免触发页面 CSP。
 
 ## 支持的 API 服务
 
@@ -100,7 +131,9 @@ xuexitong-auto-answer/
 
 ### 题目提取
 
-学习通作业页面的 DOM 结构：
+支持两种页面结构：
+
+**作业页（dowork）**：
 
 ```
 div[id^="question"].questionLi     ← 题目容器
@@ -110,12 +143,22 @@ div[id^="question"].questionLi     ← 题目容器
     └── div.answerBg               ← 选项（span.num_option[data] 为选项字母）
 ```
 
-选择题通过 `span.num_option[data]` 属性匹配答案字母，填空题通过 UEditor API / contenteditable / iframe 三层降级插入。
+**课程内测页（doHomeWorkNew）**：
+
+```
+div[id^="question"]                ← 题目容器
+├── div.Zy_TItle                   ← 题干区域
+│   └── span.newZy_TItle           ← 题型标签
+│   └── div.fontLabel              ← 题干文本（加密字体，需 OCR）
+└── ul.Zy_ulTop                    ← 选项列表
+    └── li                         ← 单个选项（span.num_option + a.after）
+```
 
 ### 答案缓存
 
 - **前端缓存**：localStorage（`xxt_answer_cache`），按题干文本做 key，跨页面持久化
 - **后端缓存**：background.js 内存 Map，同一次插件生命周期内有效，避免重复 API 调用
+- **模糊匹配**：填答时对缓存 key 做去空格匹配，容忍 OCR 两次识别的微小差异
 
 ### 重试机制
 
@@ -124,7 +167,13 @@ API 调用失败自动重试 3 次，指数退避延迟（2s → 4s → 8s），
 ## 常见问题
 
 **Q: 提示"未检测到题目"？**
-A: 确认当前页面是学习通作业/考试页面（URL 包含 `/mooc-ans/mooc2/work/dowork`）。如果页面还在加载中，等待几秒后重试。
+A: 确认当前页面是学习通作业/考试页面（URL 包含 `/mooc-ans/mooc2/work/dowork` 或 `/mooc-ans/work/doHomeWorkNew`）。如果页面还在加载中，等待几秒后重试。
+
+**Q: 课程内测页题目是乱码？**
+A: 课程内测页使用加密字体，DOM 文本是乱码。点击「一键」或「OCR」按钮，插件会自动截图识别实际显示的文字。
+
+**Q: OCR 识别不准确？**
+A: OCR 识别准确率取决于截图质量和字体渲染。如果识别结果不理想，可以尝试点击「OCR」重新识别，或手动填入答案。
 
 **Q: 选择题填答不对？**
 A: 点击「预览」查看解析出的题目和选项是否正确。如果选项解析有误，欢迎提 Issue 附上页面 DOM 截图。

@@ -160,14 +160,6 @@
         }
       });
     }
-      const altOptions = el.querySelectorAll('ul.Zy_ulTop li, li.after, label.after');
-      altOptions.forEach(opt => {
-        const optText = opt.textContent.trim();
-        if (optText && /^[A-Z]/.test(optText)) {
-          question.options.push(optText);
-        }
-      });
-    }
 
     // 如果仍没识别题型，根据内容推断
     if (!question.type) {

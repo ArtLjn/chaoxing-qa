@@ -166,6 +166,76 @@
       question.type = guessQuestionType(el, question.options);
     }
 
+    // --- 识别题目中的图片内容（公式、图表等） ---
+    if (window.xxtOcr && window.xxtOcr.isReady()) {
+      const hasImgInTitle = el.querySelector('h3.mark_name img, div.Zy_TItle img, div.fontLabel img, div.stem_answer div.clearfix img');
+      const hasImgInOptions = el.querySelector('div.answerBg img, ul.Zy_ulTop li img');
+      if (hasImgInTitle || hasImgInOptions) {
+        try {
+          // 题干中的图片
+          if (hasImgInTitle) {
+            const titleContainer = el.querySelector('h3.mark_name, div.Zy_TItle div.fontLabel, div.Zy_TItle div.clearfix, div.stem_answer div.clearfix');
+            if (titleContainer) {
+              const imgText = await window.xxtOcr.recognizeImagesInElement(titleContainer);
+              if (imgText && imgText.trim()) {
+                question.title = question.title ? question.title + ' ' + imgText.trim() : imgText.trim();
+              }
+            }
+          }
+          // 选项中的图片
+          if (hasImgInOptions) {
+            // 作业页选项图片
+            const optBgs = el.querySelectorAll('div.answerBg');
+            if (optBgs.length > 0) {
+              const imgOpts = [];
+              optBgs.forEach(optEl => {
+                const letterSpan = optEl.querySelector('span.num_option');
+                const letter = letterSpan ? (letterSpan.getAttribute('data') || letterSpan.textContent.trim()) : '';
+                const optText = optEl.textContent.trim();
+                const hasImg = optEl.querySelector('img');
+                if (hasImg) {
+                  // 图片选项：先取已有文本，后面拼接 OCR 结果
+                  imgOpts.push({ idx: imgOpts.length, letter, text: optText, el: optEl, hasImg: true });
+                } else {
+                  imgOpts.push({ idx: imgOpts.length, letter, text: optText, hasImg: false });
+                }
+              });
+              const newOpts = [];
+              for (const opt of imgOpts) {
+                if (opt.hasImg) {
+                  const imgText = await window.xxtOcr.recognizeImagesInElement(opt.el);
+                  const combined = opt.text + (imgText ? ' ' + imgText.trim() : '');
+                  newOpts.push((opt.letter ? opt.letter + '. ' : '') + combined);
+                } else {
+                  newOpts.push((opt.letter ? opt.letter + '. ' : '') + opt.text);
+                }
+              }
+              if (newOpts.length > 0) question.options = newOpts;
+            }
+            // 课程内测页选项图片
+            const liOpts = el.querySelectorAll('ul.Zy_ulTop > li');
+            if (liOpts.length > 0 && optBgs.length === 0) {
+              const newOpts = [];
+              for (const li of liOpts) {
+                const letterSpan = li.querySelector('span.num_option');
+                const letter = letterSpan ? (letterSpan.getAttribute('data') || letterSpan.textContent.trim()).toUpperCase() : '';
+                const aTag = li.querySelector('a.after');
+                const text = aTag ? aTag.textContent.trim() : li.textContent.replace(letter, '').trim();
+                if (li.querySelector('img')) {
+                  const imgText = await window.xxtOcr.recognizeImagesInElement(li);
+                  const combined = text + (imgText ? ' ' + imgText.trim() : '');
+                  newOpts.push((letter ? letter + '. ' : '') + combined);
+                } else {
+                  newOpts.push((letter ? letter + '. ' : '') + text);
+                }
+              }
+              if (newOpts.length > 0) question.options = newOpts;
+            }
+          }
+        } catch (e) { /* 图片 OCR 失败时保留已有文本 */ }
+      }
+    }
+
     // --- OCR 截图识别题目（处理字体加密等乱码场景） ---
     if (window.xxtOcr && window.xxtOcr.isReady()) {
       const hasCxSecret = !!document.getElementById('cxSecretStyle');
@@ -252,7 +322,8 @@
     if (checked) return true;
 
     // 隐藏 input answer 有值（课程内测页存答案）
-    const answerInput = el.querySelector('input[name^="answer"][type="hidden"]');
+    // 排除 answertype* 开头的（那是题型编号，不是用户答案）
+    const answerInput = el.querySelector('input[type="hidden"][name^="answer"]:not([name^="answertype"])');
     if (answerInput && answerInput.value && answerInput.value.trim()) return true;
 
     // 填空题：编辑器有内容

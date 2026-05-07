@@ -57,6 +57,8 @@
     const questions = [];
     let qList = document.querySelectorAll('div[id^="question"].questionLi');
     if (qList.length === 0) qList = document.querySelectorAll('div[id^="question"]');
+    if (qList.length === 0) qList = document.querySelectorAll('div[id^="sigleQuestionDiv"]');
+    if (qList.length === 0) qList = document.querySelectorAll('.singleQuesId');
     if (qList.length === 0) qList = document.querySelectorAll('.TiMu.newTiMu');
     if (qList.length === 0) qList = document.querySelectorAll('.TiMu.divQuestion');
     if (qList.length === 0) qList = document.querySelectorAll('.divQuestion');
@@ -129,7 +131,7 @@
     // 方式1: 作业页 dowork 结构 (div.answerBg)
     const optionEls = el.querySelectorAll('div.answerBg');
     optionEls.forEach(optEl => {
-      const letterSpan = optEl.querySelector('span.num_option');
+      const letterSpan = optEl.querySelector('span[class*="num_option"]');
       const letter = letterSpan ? letterSpan.getAttribute('data') || letterSpan.textContent.trim() : '';
       let optText = optEl.textContent.trim().replace(/\s+/g, ' ');
       if (optText) question.options.push(optText);
@@ -139,7 +141,7 @@
     if (question.options.length === 0) {
       const liOptions = el.querySelectorAll('ul.Zy_ulTop li, ul.Zy_ulTop > li');
       liOptions.forEach(li => {
-        const letterSpan = li.querySelector('span.num_option');
+        const letterSpan = li.querySelector('span[class*="num_option"]');
         const letter = letterSpan ? (letterSpan.getAttribute('data') || letterSpan.textContent.trim()) : '';
         // 选项文本在 <a> 标签里
         const aTag = li.querySelector('a.after, a[class*="after"]');
@@ -189,7 +191,7 @@
             if (optBgs.length > 0) {
               const imgOpts = [];
               optBgs.forEach(optEl => {
-                const letterSpan = optEl.querySelector('span.num_option');
+                const letterSpan = optEl.querySelector('span[class*="num_option"]');
                 const letter = letterSpan ? (letterSpan.getAttribute('data') || letterSpan.textContent.trim()) : '';
                 const optText = optEl.textContent.trim();
                 const hasImg = optEl.querySelector('img');
@@ -217,7 +219,7 @@
             if (liOpts.length > 0 && optBgs.length === 0) {
               const newOpts = [];
               for (const li of liOpts) {
-                const letterSpan = li.querySelector('span.num_option');
+                const letterSpan = li.querySelector('span[class*="num_option"]');
                 const letter = letterSpan ? (letterSpan.getAttribute('data') || letterSpan.textContent.trim()).toUpperCase() : '';
                 const aTag = li.querySelector('a.after');
                 const text = aTag ? aTag.textContent.trim() : li.textContent.replace(letter, '').trim();
@@ -263,7 +265,7 @@
             const ocrOpts = [];
             for (const li of liOptions) {
               // 获取选项字母（A/B/C/D）
-              const letterSpan = li.querySelector('span.num_option');
+              const letterSpan = li.querySelector('span[class*="num_option"]');
               const letter = letterSpan
                 ? (letterSpan.getAttribute('data') || letterSpan.textContent.trim()).toUpperCase()
                 : '';
@@ -309,8 +311,8 @@
 
   // 检测题目是否已经作答
   function isAlreadyAnswered(el) {
-    // 课程内测页: span.num_option 上有 check_answer class
-    const checkedClass = el.querySelector('span.num_option.check_answer');
+    // 课程内测页: span[class*="num_option"] 上有 check_answer class
+    const checkedClass = el.querySelector('span[class*="num_option"].check_answer');
     if (checkedClass) return true;
 
     // 作业页: div.answerBg 有 cur/checked/selected class
@@ -591,91 +593,98 @@
     const type = question.type.replace(/\s/g, '');
     log(`[填答] 题型="${type}" 答案="${answer}"`);
 
-    if (type === '单选题' || type === '多选题') {
+    if (type.includes('多选') || type.includes('单选')) {
       return fillChoice(question, answer);
     }
 
-    if (type === '判断题') {
+    if (type.includes('判断')) {
       return fillJudgement(question, answer);
     }
 
-    if (type === '填空题') {
+    if (type.includes('填空')) {
       return fillBlank(question, answer);
     }
 
-    // 答案以字母开头且不是判断，按选择题处理
-    if (/^[A-Z]+$/i.test(answer.replace(/[,，、\s]/g, '')) && answer.replace(/[,，、\s]/g, '').length <= 4) {
+    // 兜底：答案全是字母按选择题处理
+    const cleanAnswer = answer.replace(/[,，、\s]/g, '');
+    if (/^[A-Z]+$/i.test(cleanAnswer) && cleanAnswer.length <= 6) {
       return fillChoice(question, answer);
     }
 
     return false;
   }
 
+  // 获取选项字母（统一用显示文本，避免超星 data 属性扰乱）
+  function getOptionLetter(optEl) {
+    const letterSpan = optEl.querySelector('span[class*="num_option"]');
+    if (letterSpan) {
+      const text = letterSpan.textContent.trim().toUpperCase();
+      if (text) return text;
+      const data = letterSpan.getAttribute('data');
+      if (data) return data.toUpperCase();
+    }
+    return '';
+  }
+
+  // 点击选项（多策略确保选中）
+  function clickOption(optEl) {
+    // 策略1: 直接点击容器
+    optEl.click();
+
+    // 策略2: 点击字母 span（部分页面事件绑在这里）
+    const letterSpan = optEl.querySelector('span[class*="num_option"]');
+    if (letterSpan) letterSpan.click();
+
+    // 策略3: 直接设置底层 input
+    const input = optEl.querySelector('input[type="radio"], input[type="checkbox"]');
+    if (input && !input.checked) {
+      input.checked = true;
+      input.dispatchEvent(new Event('change', { bubbles: true }));
+    }
+  }
+
   // 选择题：点击对应选项
   function fillChoice(question, answer) {
-    const letters = answer.replace(/[,，、\s]/g, '').split('').filter(c => /[A-Z]/i.test(c));
+    const letters = answer.replace(/[,，、\s]/g, '').toUpperCase().split('').filter(c => /[A-Z]/.test(c));
     log(`[填答] 需要选择: ${letters.join(',')}`);
     let filled = 0;
 
-    // 方式1: 作业页 div.answerBg
+    // 方式1: div.answerBg（作业页 + 预览页通用）
     const optionEls = question.element.querySelectorAll('div.answerBg');
     if (optionEls.length > 0) {
-      optionEls.forEach(optEl => {
-        const letterSpan = optEl.querySelector('span.num_option');
-        const letter = letterSpan ? (letterSpan.getAttribute('data') || letterSpan.textContent.trim()).toUpperCase() : '';
+      optionEls.forEach((optEl, idx) => {
+        let letter = getOptionLetter(optEl);
+        // 兜底：按位置推断
+        if (!letter || letter.length > 1) {
+          letter = String.fromCharCode(65 + idx);
+        }
         if (letters.includes(letter)) {
-          optEl.click();
+          clickOption(optEl);
           filled++;
         }
       });
-      return filled > 0;
+      if (filled > 0) return true;
     }
 
     // 方式2: 课程内测页 ul.Zy_ulTop > li
     const liOptions = question.element.querySelectorAll('ul.Zy_ulTop li');
     if (liOptions.length > 0) {
       liOptions.forEach((li, idx) => {
-        // 获取选项字母
-        const letterSpan = li.querySelector('span.num_option');
-        let letter = '';
-
-        if (letterSpan) {
-          letter = (letterSpan.getAttribute('data') || letterSpan.textContent.trim()).toUpperCase();
-        }
+        let letter = getOptionLetter(li);
         if (!letter) {
           const textMatch = li.textContent.trim().match(/^([A-Z])[、.．\s]/);
           if (textMatch) letter = textMatch[1];
         }
-        if (!letter && idx < 4) {
+        if (!letter || letter.length > 1) {
           letter = String.fromCharCode(65 + idx);
         }
 
-        log(`[填答] 检测到选项: ${letter}，需匹配: ${letters.includes(letter)}`);
-
         if (letters.includes(letter)) {
-          // 方式A：直接触发底层 input[radio/checkbox]
-          const input = li.querySelector('input[type="radio"], input[type="checkbox"]');
-          if (input && !input.checked) {
-            input.checked = true;
-            input.dispatchEvent(new Event('change', { bubbles: true }));
-            input.dispatchEvent(new Event('click', { bubbles: true }));
-            filled++;
-            return;
-          }
-
-          // 方式B：触发 span.num_option 的 click（学习通内测页选中逻辑挂在这里）
-          if (letterSpan) {
-            letterSpan.click();
-            filled++;
-            return;
-          }
-
-          // 方式C：直接操作 li
-          li.click();
+          clickOption(li);
           filled++;
         }
       });
-      return filled > 0;
+      if (filled > 0) return true;
     }
 
     log(`[填答] 未找到可点击的选项元素`);
@@ -686,66 +695,44 @@
   function fillJudgement(question, answer) {
     const isRight = /对|正确|✓|√|true|T/i.test(answer);
 
-    // 判断题关键词：对/错、TRUE/FALSE、是/否、正确/错误
     const rightWords = ['对', '正确', '是', 'true', 'TRUE', '√', '✓', 'yes', 'YES', 'right'];
     const wrongWords = ['错', '错误', '否', 'false', 'FALSE', '×', '✗', 'no', 'NO', 'wrong'];
     const targetWords = isRight ? rightWords : wrongWords;
 
-    // 方式1: 作业页 div.answerBg
+    // 方式1: div.answerBg 文本匹配
     const optionEls = question.element.querySelectorAll('div.answerBg');
     if (optionEls.length > 0) {
       for (const optEl of optionEls) {
         const text = optEl.textContent.trim().toUpperCase();
         if (targetWords.some(w => text.includes(w.toUpperCase()))) {
-          optEl.click();
+          clickOption(optEl);
           return true;
         }
       }
-      // 按字母：A=对 B=错
+      // 回退：A=对 B=错
       const letter = isRight ? 'A' : 'B';
       for (const optEl of optionEls) {
-        const l = optEl.querySelector('span.num_option');
-        const data = l ? (l.getAttribute('data') || l.textContent.trim()).toUpperCase() : '';
-        if (data === letter) {
-          optEl.click();
+        if (getOptionLetter(optEl) === letter) {
+          clickOption(optEl);
           return true;
         }
       }
     }
 
-    // 方式2: 课程内测页 ul.Zy_ulTop > li
+    // 方式2: ul.Zy_ulTop > li
     const liOptions = question.element.querySelectorAll('ul.Zy_ulTop li');
     if (liOptions.length > 0) {
       for (const li of liOptions) {
         const text = li.textContent.trim().toUpperCase();
-        log(`[填答] 判断题选项文本: ${text}`);
         if (targetWords.some(w => text.includes(w.toUpperCase()))) {
-          // 点击选项
-          const input = li.querySelector('input[type="radio"], input[type="checkbox"]');
-          if (input && !input.checked) {
-            input.checked = true;
-            input.dispatchEvent(new Event('change', { bubbles: true }));
-            input.dispatchEvent(new Event('click', { bubbles: true }));
-            return true;
-          }
-          const letterSpan = li.querySelector('span.num_option');
-          if (letterSpan) { letterSpan.click(); return true; }
-          li.click();
+          clickOption(li);
           return true;
         }
       }
-
-      // 回退：第一个 li = 对，第二个 li = 错
+      // 回退：第一个 = 对，第二个 = 错
       const idx = isRight ? 0 : 1;
       if (liOptions[idx]) {
-        const input = liOptions[idx].querySelector('input[type="radio"], input[type="checkbox"]');
-        if (input && !input.checked) {
-          input.checked = true;
-          input.dispatchEvent(new Event('change', { bubbles: true }));
-          input.dispatchEvent(new Event('click', { bubbles: true }));
-          return true;
-        }
-        liOptions[idx].click();
+        clickOption(liOptions[idx]);
         return true;
       }
     }
@@ -760,7 +747,6 @@
 
     // 收集所有可能的填空输入区域
     let answerDivs = question.element.querySelectorAll('div.Answer');
-    // 课程内测页：填空区域可能是 div.answerTip 或 div.write-tip-wrap
     if (answerDivs.length === 0) {
       answerDivs = question.element.querySelectorAll('div.answerTip, div.write-tip-wrap, div[id^="answer"]');
     }
@@ -784,7 +770,6 @@
           }
         } catch (e) { /* 降级 */ }
 
-        // contenteditable
         const editable = div.querySelector('[contenteditable="true"]');
         if (editable) {
           editable.textContent = text;
@@ -793,7 +778,6 @@
           return;
         }
 
-        // iframe
         const iframe = div.querySelector('iframe');
         if (iframe && iframe.contentDocument) {
           iframe.contentDocument.body.textContent = text;
@@ -803,7 +787,6 @@
         }
       }
 
-      // 方式2：课程内测页 textarea（在 div 内或紧邻）
       const textarea = div.querySelector('textarea');
       if (textarea) {
         const setter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')?.set;
@@ -815,7 +798,6 @@
         return;
       }
 
-      // 方式3：普通 input
       const input = div.querySelector('input[type="text"]');
       if (input) {
         const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set;
@@ -849,44 +831,130 @@
     return filled > 0;
   }
 
+  // 缓存匹配：多策略查找答案
+  function findCachedAnswer(title, cache) {
+    // 精确匹配
+    if (cache[title]) return cache[title];
+
+    const cleanTitle = title.replace(/\s/g, '');
+
+    // 去空格匹配
+    for (const [k, v] of Object.entries(cache)) {
+      if (k.replace(/\s/g, '') === cleanTitle) return v;
+    }
+
+    // 去标点匹配
+    const noPunct = cleanTitle.replace(/[，。、；：？！,.\-;:?!""''（）()【】\[\]]/g, '');
+    for (const [k, v] of Object.entries(cache)) {
+      if (k.replace(/\s/g, '').replace(/[，。、；：？！,.\-;:?!""''（）()【】\[\]]/g, '') === noPunct) return v;
+    }
+
+    // 前缀匹配（题干可能被截断或 OCR 有误差）
+    for (const [k, v] of Object.entries(cache)) {
+      const kClean = k.replace(/\s/g, '');
+      if (kClean.length > 10 && cleanTitle.length > 10) {
+        if (cleanTitle.startsWith(kClean.substring(0, 10)) || kClean.startsWith(cleanTitle.substring(0, 10))) {
+          return v;
+        }
+      }
+    }
+
+    return null;
+  }
+
+  // 清除所有已选答案
+  function clearAllAnswers() {
+    let cleared = 0;
+
+    // 取消 radio/checkbox 选中
+    document.querySelectorAll('input[type="radio"]:checked, input[type="checkbox"]:checked').forEach(input => {
+      input.checked = false;
+      input.dispatchEvent(new Event('change', { bubbles: true }));
+      cleared++;
+    });
+
+    // 移除选项高亮样式 + check_answer
+    document.querySelectorAll('div.answerBg.cur, div.answerBg.checked, div.answerBg.selected').forEach(el => {
+      el.classList.remove('cur', 'checked', 'selected');
+      cleared++;
+    });
+    document.querySelectorAll('span[class*="num_option"].check_answer').forEach(el => {
+      el.classList.remove('check_answer');
+      cleared++;
+    });
+
+    // 清除文本输入
+    document.querySelectorAll('input[type="text"]').forEach(input => {
+      if (input.value) { input.value = ''; cleared++; }
+    });
+    document.querySelectorAll('textarea').forEach(ta => {
+      if (ta.value) { ta.value = ''; cleared++; }
+    });
+    document.querySelectorAll('[contenteditable="true"]').forEach(el => {
+      if (el.textContent.trim()) { el.textContent = ''; cleared++; }
+    });
+
+    // 清除隐藏 answer/answers 字段
+    document.querySelectorAll('input[type="hidden"][name^="answer"]').forEach(input => {
+      const name = input.name || '';
+      // 排除题型字段（answertype / typeName）
+      if (name.startsWith('answertype') || name.startsWith('typeName')) return;
+      if (input.value) { input.value = ''; cleared++; }
+    });
+
+    return cleared;
+  }
+
+  // 重填：清除后重新填答
+  async function reFillAll() {
+    const cleared = clearAllAnswers();
+    log(`已清除 ${cleared} 处选中状态`);
+    await new Promise(r => setTimeout(r, 500));
+    await autoFillAll();
+  }
+
   // 一键填答所有已有答案的题目
   async function autoFillAll() {
     const questions = await extractQuestions();
     const cache = loadCache();
-    let filled = 0, failed = 0;
+    let filled = 0, failed = 0, skipped = 0;
 
-    log(`📝 开始自动填答，共 ${questions.length} 题`);
+    log(`开始填答，共 ${questions.length} 题，缓存 ${Object.keys(cache).length} 条`);
 
     for (const q of questions) {
-      // 先精确匹配，再模糊匹配（OCR 两次结果可能略有差异）
-      let answer = cache[q.title];
-      if (!answer) {
-        const qTitleClean = q.title.replace(/\s/g, '');
-        for (const [k, v] of Object.entries(cache)) {
-          if (k.replace(/\s/g, '') === qTitleClean) {
-            answer = v;
-            break;
-          }
-        }
+      // 已作答的题目跳过，避免重复点击导致取消选中
+      if (q.answered) {
+        skipped++;
+        continue;
       }
+
+      const answer = findCachedAnswer(q.title, cache);
       if (!answer) {
-        log(`[第${q.index}题] ⏭ 无答案，跳过`);
+        skipped++;
         continue;
       }
 
       const ok = autoFillAnswer(q, answer);
       if (ok) {
-        log(`[第${q.index}题] ✅ 已填答: ${answer}`);
+        log(`[第${q.index}题] ${answer}`);
         filled++;
       } else {
-        log(`[第${q.index}题] ❌ 填答失败`);
-        failed++;
+        // 重试一次（部分页面需要二次点击才能选中）
+        await new Promise(r => setTimeout(r, 200));
+        const ok2 = autoFillAnswer(q, answer);
+        if (ok2) {
+          log(`[第${q.index}题] ${answer} (重试成功)`);
+          filled++;
+        } else {
+          log(`[第${q.index}题] 填答失败: 题型=${q.type} 答案=${answer}`);
+          failed++;
+        }
       }
 
-      await new Promise(r => setTimeout(r, 300));
+      await new Promise(r => setTimeout(r, 200));
     }
 
-    log(`📊 填答完成: 成功 ${filled} | 失败 ${failed}`);
+    log(`填答完成: 成功 ${filled} | 失败 ${failed} | 跳过 ${skipped}`);
   }
 
   function showSummary() {
@@ -920,6 +988,8 @@
     // 不走 extractQuestions（里面也会 OCR），直接拿 DOM 元素
     let qList = document.querySelectorAll('div[id^="question"].questionLi');
     if (qList.length === 0) qList = document.querySelectorAll('div[id^="question"]');
+    if (qList.length === 0) qList = document.querySelectorAll('div[id^="sigleQuestionDiv"]');
+    if (qList.length === 0) qList = document.querySelectorAll('.singleQuesId');
     if (qList.length === 0) qList = document.querySelectorAll('.TiMu.newTiMu');
     if (qList.length === 0) qList = document.querySelectorAll('.TiMu.divQuestion');
     if (qList.length === 0) qList = document.querySelectorAll('.divQuestion');
@@ -956,7 +1026,7 @@
       const liOptions = el.querySelectorAll('ul.Zy_ulTop > li');
       if (liOptions.length > 0) {
         for (const li of liOptions) {
-          const letterSpan = li.querySelector('span.num_option');
+          const letterSpan = li.querySelector('span[class*="num_option"]');
           const letter = letterSpan
             ? (letterSpan.getAttribute('data') || letterSpan.textContent.trim()).toUpperCase()
             : '';
@@ -1026,6 +1096,8 @@
     // 获取题目 DOM 元素
     let qList = document.querySelectorAll('div[id^="question"].questionLi');
     if (qList.length === 0) qList = document.querySelectorAll('div[id^="question"]');
+    if (qList.length === 0) qList = document.querySelectorAll('div[id^="sigleQuestionDiv"]');
+    if (qList.length === 0) qList = document.querySelectorAll('.singleQuesId');
     if (qList.length === 0) qList = document.querySelectorAll('.TiMu.newTiMu');
     if (qList.length === 0) qList = document.querySelectorAll('.TiMu.divQuestion');
     if (qList.length === 0) qList = document.querySelectorAll('.divQuestion');
@@ -1082,7 +1154,7 @@
         const liOptions = el.querySelectorAll('ul.Zy_ulTop > li');
         if (liOptions.length > 0) {
           for (const li of liOptions) {
-            const letterSpan = li.querySelector('span.num_option');
+            const letterSpan = li.querySelector('span[class*="num_option"]');
             const letter = letterSpan
               ? (letterSpan.getAttribute('data') || letterSpan.textContent.trim()).toUpperCase()
               : '';
@@ -1239,12 +1311,17 @@
       <div id="xxt-float-body">
         <div id="xxt-float-status">就绪</div>
         <div id="xxt-float-actions">
-          <button id="xxt-float-start">搜题</button>
-          <button id="xxt-float-fill">填答</button>
-          <button id="xxt-float-oneclick">一键</button>
-          <button id="xxt-float-preview">预览</button>
-          <button id="xxt-float-ocr">OCR</button>
-          <button id="xxt-float-answers">答案</button>
+          <button id="xxt-float-oneclick" class="xxt-btn-hero">一键搜题</button>
+          <div class="xxt-btn-row">
+            <button id="xxt-float-start" class="xxt-btn xxt-btn-blue">搜题</button>
+            <button id="xxt-float-fill" class="xxt-btn xxt-btn-green">填答</button>
+            <button id="xxt-float-refill" class="xxt-btn xxt-btn-green">重填</button>
+          </div>
+          <div class="xxt-btn-row">
+            <button id="xxt-float-preview" class="xxt-btn xxt-btn-dim">预览</button>
+            <button id="xxt-float-ocr" class="xxt-btn xxt-btn-dim">OCR</button>
+            <button id="xxt-float-answers" class="xxt-btn xxt-btn-dim">答案</button>
+          </div>
         </div>
         <div id="xxt-float-log"></div>
       </div>
@@ -1270,6 +1347,7 @@
     });
     document.getElementById('xxt-float-answers').addEventListener('click', toggleAnswerPanel);
     document.getElementById('xxt-float-fill').addEventListener('click', autoFillAll);
+    document.getElementById('xxt-float-refill').addEventListener('click', reFillAll);
 
     makeDraggable(container, document.getElementById('xxt-float-header'));
   }

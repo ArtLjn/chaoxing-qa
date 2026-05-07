@@ -32,6 +32,9 @@
         "https://mooc1.chaoxing.com/mooc-ans/work/doHomeWorkNew*",
         "https://mooc1-1.chaoxing.com/mooc-ans/work/doHomeWorkNew*",
         "https://mooc1-2.chaoxing.com/mooc-ans/work/doHomeWorkNew*",
+        "https://mooc1.chaoxing.com/exam-ans/mooc2/exam/preview*",
+        "https://mooc1-1.chaoxing.com/exam-ans/mooc2/exam/preview*",
+        "https://mooc1-2.chaoxing.com/exam-ans/mooc2/exam/preview*",
         "https://mooc1.chaoxing.com/ananas/modules/work/*"
       ],
       "js": ["lib/html2canvas.min.js", "lib/tesseract.min.js", "ocr.js", "content.js"],

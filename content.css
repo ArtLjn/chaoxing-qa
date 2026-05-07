@@ -5,7 +5,7 @@
   position: fixed;
   right: 20px;
   bottom: 20px;
-  width: 320px;
+  width: 300px;
   background: #1a1a2e;
   border-radius: 12px;
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
@@ -48,136 +48,131 @@
 }
 
 #xxt-float-body {
-  padding: 12px;
+  padding: 10px 12px 12px;
 }
 
 #xxt-float-status {
   text-align: center;
-  padding: 6px 0;
+  padding: 4px 0 8px;
   color: #a0a0a0;
   font-size: 12px;
 }
 
-#xxt-float-start {
-  flex: 1;
-  padding: 10px 4px;
-  border: none;
-  border-radius: 8px;
-  background: linear-gradient(135deg, #0f3460, #533483);
-  color: #fff;
-  font-size: 12px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.2s ease;
-}
-
-#xxt-float-start:hover {
-  background: linear-gradient(135deg, #16213e, #6a4c93);
-}
-
-#xxt-float-start.running {
-  background: linear-gradient(135deg, #c0392b, #e74c3c);
-}
-
-#xxt-float-start.running:hover {
-  background: linear-gradient(135deg, #a93226, #c0392b);
-}
+/* ==================== 按钮布局 ==================== */
 
 #xxt-float-actions {
   display: flex;
+  flex-direction: column;
   gap: 6px;
   margin-bottom: 8px;
 }
 
-#xxt-float-fill {
+.xxt-btn-row {
+  display: flex;
+  gap: 6px;
+}
+
+/* 通用按钮基础样式 */
+.xxt-btn {
   flex: 1;
-  padding: 10px 4px;
-  border: 1px solid #2a4a2a;
-  border-radius: 8px;
-  background: #16213e;
-  color: #27ae60;
+  padding: 7px 4px;
+  border-radius: 6px;
   font-size: 12px;
   font-weight: 500;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: all 0.15s ease;
+  text-align: center;
 }
 
-#xxt-float-fill:hover {
-  background: #1e2a4a;
-  border-color: #27ae60;
-}
-
-#xxt-float-preview {
-  flex: 1;
+/* Hero 主按钮：一键搜题 */
+.xxt-btn-hero {
+  width: 100%;
   padding: 10px 4px;
-  border: 1px solid #2a2a4a;
+  border: none;
   border-radius: 8px;
-  background: #16213e;
-  color: #a8d8ea;
-  font-size: 12px;
-  font-weight: 500;
-  cursor: pointer;
-  transition: all 0.2s ease;
-}
-
-#xxt-float-preview:hover {
-  background: #1e2a4a;
-  border-color: #533483;
-}
-
-#xxt-float-oneclick {
-  flex: 1;
-  padding: 10px 4px;
-  border: 1px solid #2a4a2a;
-  border-radius: 8px;
-  background: linear-gradient(135deg, #0f3460, #1a6b3c);
+  background: linear-gradient(135deg, #1a6b3c, #0f9d58);
   color: #fff;
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 600;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: all 0.15s ease;
+  letter-spacing: 0.5px;
 }
 
-#xxt-float-oneclick:hover {
-  background: linear-gradient(135deg, #16213e, #27ae60);
+.xxt-btn-hero:hover {
+  background: linear-gradient(135deg, #0f9d58, #27ae60);
+  box-shadow: 0 2px 12px rgba(39, 174, 96, 0.3);
+}
+
+/* 搜题按钮（蓝） */
+.xxt-btn-blue {
+  border: 1px solid #1e3a5f;
+  background: #16213e;
+  color: #5dade2;
+}
+
+.xxt-btn-blue:hover {
+  background: #1e2a4a;
+  border-color: #5dade2;
+}
+
+/* 搜题按钮运行中状态 */
+.xxt-btn-blue.running {
+  background: linear-gradient(135deg, #922b21, #c0392b);
+  border-color: #c0392b;
+  color: #fff;
+}
+
+.xxt-btn-blue.running:hover {
+  background: linear-gradient(135deg, #7b241c, #a93226);
+}
+
+/* 填答/重填按钮（绿） */
+.xxt-btn-green {
+  border: 1px solid #1e3e2a;
+  background: #16213e;
+  color: #27ae60;
+}
+
+.xxt-btn-green:hover {
+  background: #1e2a4a;
   border-color: #27ae60;
 }
 
-#xxt-float-ocr {
-  flex: 1;
-  padding: 10px 4px;
-  border: 1px solid #2a2a4a;
-  border-radius: 8px;
+/* 工具按钮（灰） */
+.xxt-btn-dim {
+  border: 1px solid #2a2a3a;
   background: #16213e;
-  color: #e74c3c;
-  font-size: 12px;
-  font-weight: 500;
-  cursor: pointer;
-  transition: all 0.2s ease;
+  color: #888;
+}
+
+.xxt-btn-dim:hover {
+  background: #1e2a4a;
+  border-color: #555;
+  color: #bbb;
+}
+
+/* OCR 工具按钮特殊色 */
+#xxt-float-ocr {
+  color: #c0392b;
+  border-color: #2a1a1a;
 }
 
 #xxt-float-ocr:hover {
-  background: #1e2a4a;
-  border-color: #e74c3c;
+  border-color: #c0392b;
 }
 
+/* 答案按钮特殊色 */
 #xxt-float-answers {
-  flex: 1;
-  padding: 10px 4px;
-  border: 1px solid #2a2a4a;
-  border-radius: 8px;
-  background: #16213e;
   color: #f39c12;
-  font-size: 12px;
-  font-weight: 500;
-  cursor: pointer;
-  transition: all 0.2s ease;
+  border-color: #2a2a1a;
 }
 
 #xxt-float-answers:hover {
-  background: #1e2a4a;
   border-color: #f39c12;
 }
+
+/* ==================== 日志区域 ==================== */
 
 #xxt-float-log {
   max-height: 200px;
@@ -208,12 +203,13 @@
   border-radius: 2px;
 }
 
-/* 题目旁的答案标签 */
+/* ==================== 题目旁答案标签 ==================== */
+
 .xxt-answer-tag {
   margin: 8px 0;
   padding: 8px 12px;
-  background: rgba(83, 52, 131, 0.15);
-  border-left: 3px solid #533483;
+  background: rgba(39, 174, 96, 0.1);
+  border-left: 3px solid #27ae60;
   border-radius: 4px;
   font-size: 13px;
   color: #333;
@@ -221,11 +217,12 @@
 }
 
 .xxt-answer-tag strong {
-  color: #533483;
+  color: #27ae60;
   font-size: 14px;
 }
 
-/* 答案面板 */
+/* ==================== 答案面板 ==================== */
+
 #xxt-answer-panel {
   position: fixed;
   top: 0;
@@ -316,7 +313,7 @@
 }
 
 .xxt-ap-type {
-  color: #533483;
+  color: #5dade2;
 }
 
 .xxt-ap-title {
@@ -359,7 +356,8 @@
   color: #666;
 }
 
-/* 预览调试标签 */
+/* ==================== 预览调试标签 ==================== */
+
 .xxt-debug-tag {
   margin: 4px 0;
   padding: 6px 10px;
@@ -371,10 +369,11 @@
 }
 
 .xxt-debug-tag b {
-  color: #533483;
+  color: #5dade2;
 }
 
-/* OCR 识别结果标签 */
+/* ==================== OCR 识别结果标签 ==================== */
+
 .xxt-ocr-tag {
   margin: 8px 0;
   padding: 8px 12px;

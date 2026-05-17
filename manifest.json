@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "学习通搜题助手",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "自动提取学习通作业题目，调用阿里百炼AI模型搜索答案",
   "permissions": ["storage", "activeTab"],
   "host_permissions": [

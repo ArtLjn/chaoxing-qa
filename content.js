@@ -3,6 +3,8 @@
 (function () {
   'use strict';
 
+  const PLUGIN_VERSION = '1.1.0';
+
   // 防止重复注入
   if (window.__xxtSearcherLoaded) return;
   window.__xxtSearcherLoaded = true;
@@ -20,6 +22,33 @@
     try {
       return JSON.parse(localStorage.getItem(CACHE_KEY) || '{}');
     } catch { return {}; }
+  }
+
+  // 启动时清理格式不合法的旧缓存（单选题缓存了长文本等）
+  function cleanupBadCache() {
+    const cache = loadCache();
+    let cleaned = 0;
+    for (const [title, answer] of Object.entries(cache)) {
+      if (!answer || typeof answer !== 'string') {
+        delete cache[title];
+        cleaned++;
+        continue;
+      }
+      // 单选题缓存了多个字母以外的内容
+      if (/^[A-Z]$/.test(answer)) continue; // 合法
+      if (/^[A-Z]{2,6}$/.test(answer) && new Set(answer).size === answer.length) continue; // 多选合法
+      if (answer === '对' || answer === '错') continue; // 判断合法
+      if (answer.includes('|') && answer.split('|').every(s => s.trim().length > 0)) continue; // 填空合法
+      // 单个文字答案也算合法（填空题单空）
+      if (answer.length <= 20 && !answer.includes('，') && !answer.includes('。') && !answer.includes('、')) continue;
+      // 不合法，清理
+      delete cache[title];
+      cleaned++;
+    }
+    if (cleaned > 0) {
+      saveCache(cache);
+      console.log(`[XXT] 清理了 ${cleaned} 条格式不合法的缓存`);
+    }
   }
 
   function saveCache(cache) {
@@ -78,7 +107,8 @@
       title: '',
       options: [],
       element: el,
-      answered: false
+      answered: false,
+      blankCount: 0
     };
 
     question.answered = isAlreadyAnswered(el);
@@ -166,6 +196,18 @@
     // 如果仍没识别题型，根据内容推断
     if (!question.type) {
       question.type = guessQuestionType(el, question.options);
+    }
+
+    // --- 统计填空题的空数 ---
+    if (question.type.includes('填空')) {
+      const blankMatches = question.title.match(/_{2,}|＿{2,}|…{2,}/g);
+      if (blankMatches) {
+        question.blankCount = blankMatches.length;
+      } else {
+        // 通过页面上的输入框数量推断
+        const inputCount = el.querySelectorAll('input[type="text"], textarea, [contenteditable="true"]').length;
+        if (inputCount > 0) question.blankCount = inputCount;
+      }
     }
 
     // --- 识别题目中的图片内容（公式、图表等） ---
@@ -514,21 +556,24 @@
 
         // 调用 AI
         log(`[第${currentIndex}题] 🔍 正在搜索答案...`);
+        const searchStart = Date.now();
         const result = await sendToBackground('solve', {
           title: q.title,
           options: q.options,
-          type: q.type
+          type: q.type,
+          blankCount: q.blankCount
         });
+        const searchTime = ((Date.now() - searchStart) / 1000).toFixed(1);
 
         if (!isSearching) break;
 
         if (result.error) {
-          log(`[第${currentIndex}题] ❌ 搜索失败: ${result.error}`);
+          log(`[第${currentIndex}题] ❌ 搜索失败 (${searchTime}s): ${result.error}`);
           questionResults.set(currentIndex, { status: 'fail', answer: null });
           continue;
         }
 
-        log(`[第${currentIndex}题] ✅ 答案: ${result.answer}`);
+        log(`[第${currentIndex}题] ✅ 答案: ${result.answer} (${searchTime}s)`);
         // 存入前端缓存
         setCacheAnswer(q.title, result.answer);
         questionResults.set(currentIndex, { status: 'success', answer: result.answer });
@@ -1134,15 +1179,35 @@
         const ocrOpts = [];
         let questionType = '';
 
+        // 优先从 DOM 提取题型（比 OCR 更可靠）
+        const domTypeSpan = el.querySelector('span.colorShallow, .colorShallow, span.newZy_TItle');
+        if (domTypeSpan) {
+          questionType = domTypeSpan.textContent.trim().replace(/[()（）\[\]【】]/g, '');
+        }
+        if (!questionType) {
+          const domH3 = el.querySelector('h3.mark_name, .mark_name, h3[class*="mark"]');
+          if (domH3) {
+            const ts = domH3.querySelector('span.colorShallow, .colorShallow');
+            if (ts) questionType = ts.textContent.trim().replace(/[()（）\[\]【】]/g, '');
+          }
+        }
+        if (!questionType) {
+          const allText = el.textContent;
+          const tm = allText.match(/[\[【\(（]?\s*(单选题|多选题|判断题|填空题|简答题)\s*[\]】\)）]?/);
+          if (tm) questionType = tm[1];
+        }
+
         // 截图识别题干
         const titleEl = el.querySelector('div.Zy_TItle div.fontLabel, div.Zy_TItle div.clearfix, h3.mark_name')
           || el.querySelector('div.Zy_TItle');
         if (titleEl) {
           ocrTitle = await window.xxtOcr.recognizeElement(titleEl);
           if (ocrTitle) {
-            // 提取题型
-            const typeMatch = ocrTitle.match(/[\[【\(（]?\s*(单选题|多选题|判断题|填空题|简答题)\s*[\]】\)）]?/);
-            if (typeMatch) questionType = typeMatch[1];
+            // 如果 DOM 没提取到题型，从 OCR 文本补充
+            if (!questionType) {
+              const typeMatch = ocrTitle.match(/[\[【\(（]?\s*(单选题|多选题|判断题|填空题|简答题)\s*[\]】\)）]?/);
+              if (typeMatch) questionType = typeMatch[1];
+            }
             ocrTitle = ocrTitle
               .replace(/[\[【\(（]?\s*(单选题|多选题|判断题|填空题|简答题)\s*[\]】\)）]?/g, '')
               .replace(/^\s*\d+\s*[.．、]\s*/, '')
@@ -1177,6 +1242,13 @@
           questionType = guessQuestionType(el, ocrOpts);
         }
 
+        // 统计 OCR 填空题空数
+        let ocrBlankCount = 0;
+        if (questionType.includes('填空') && ocrTitle) {
+          const blankMatches = ocrTitle.match(/_{2,}|＿{2,}|…{2,}/g);
+          if (blankMatches) ocrBlankCount = blankMatches.length;
+        }
+
         if (ocrTitle || ocrOpts.length > 0) {
           ocrSuccess++;
           log(`[第${currentIndex}题] ✅ ${ocrTitle ? ocrTitle.substring(0, 50) : '(无题干)'}`);
@@ -1195,7 +1267,7 @@
         tag.innerHTML = tagHtml;
         el.appendChild(tag);
 
-        ocrResults.push({ el, ocrTitle, ocrOpts, questionType, answered: isAlreadyAnswered(el) });
+        ocrResults.push({ el, ocrTitle, ocrOpts, questionType, answered: isAlreadyAnswered(el), blankCount: ocrBlankCount });
       }
 
       log(`📊 OCR 完成: ${ocrSuccess}/${totalCount} 题`);
@@ -1228,11 +1300,12 @@
           continue;
         }
 
-        log(`[第${i + 1}题] 🔍 搜索答案...`);
+        log(`[第${i + 1}题] 🔍 [${item.questionType || '未知'}] 搜索答案...`);
         const result = await sendToBackground('solve', {
           title: item.ocrTitle,
           options: item.ocrOpts,
-          type: item.questionType
+          type: item.questionType,
+          blankCount: item.blankCount || 0
         });
 
         if (!isSearching) break;
@@ -1305,11 +1378,11 @@
     container.id = 'xxt-float';
     container.innerHTML = `
       <div id="xxt-float-header">
-        <span id="xxt-float-title">XuexiTong Assistant</span>
+        <span id="xxt-float-title">XuexiTong Assistant <small>v${PLUGIN_VERSION}</small></span>
         <button id="xxt-float-toggle">_</button>
       </div>
       <div id="xxt-float-body">
-        <div id="xxt-float-status">就绪</div>
+        <div id="xxt-float-status">就绪 v${PLUGIN_VERSION}</div>
         <div id="xxt-float-actions">
           <button id="xxt-float-oneclick" class="xxt-btn-hero">一键搜题</button>
           <div class="xxt-btn-row">
@@ -1445,11 +1518,14 @@
 
     if (!document.body || document.body.children.length === 0) return false;
 
+    // 启动时清理格式不合法的旧缓存
+    cleanupBadCache();
+
     // 没有题目元素的页面不注入浮窗
     if (!checkPageHasQuestions()) return false;
 
     createFloatUI();
-    log('插件已加载，点击「搜题」');
+    log(`插件已加载 v${PLUGIN_VERSION}，点击「搜题」`);
 
     return true;
   }
